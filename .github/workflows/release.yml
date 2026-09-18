@@ -24,7 +24,19 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$env:GITHUB_REF_NAME" (Get-Item dist/*.exe) --generate-notes
+        # Cutting the release in the GitHub UI is what creates the tag that
+        # triggers this run, so the release already exists by the time we get
+        # here and `create` collides. Upload into whichever release the tag has
+        # and only create one when there is none — which also makes a re-run of
+        # a failed build safe. `release list` is the existence check because it
+        # exits 0 either way; `release view` exits 1 and pwsh 7.4 turns a failed
+        # native command into a terminating error.
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          if ((gh release list --json tagName --jq '.[].tagName') -notcontains $tag) {
+            gh release create $tag --generate-notes
+          }
+          gh release upload $tag (Get-Item dist/*.exe) --clobber
       - uses: actions/upload-artifact@v4
         with:
           name: WalletBudgetWidget
