@@ -13,5 +13,26 @@
   "devDependencies": {
     "electron": "^33.2.0",
     "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.gloopy.walletbudgetwidget",
+    "productName": "Wallet Budget Widget",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main/**",
+      "renderer/**",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "artifactName": "WalletBudgetWidget-${version}.exe"
+    },
+    "portable": {
+      "artifactName": "WalletBudgetWidget-${version}.exe"
+    }
   }
 }
