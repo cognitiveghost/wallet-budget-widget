@@ -29,7 +29,8 @@
       "target": [
         "portable"
       ],
-      "artifactName": "WalletBudgetWidget-${version}.exe"
+      "artifactName": "WalletBudgetWidget-${version}.exe",
+      "signAndEditExecutable": false
     },
     "portable": {
       "artifactName": "WalletBudgetWidget-${version}.exe"
