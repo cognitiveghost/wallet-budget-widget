@@ -243,3 +243,65 @@ test('signed amount reads the {value} object the API returns', () => {
   const r = f.runway(records, [], 100, '2026-09-01', '2026-09-30', '2026-09-18');
   assert.equal(r.actual[1].balance, 60);
 });
+
+// --- everyday spending on the line ----------------------------------------
+// The projected half used to book only what it had a date for, so the line
+// drifted up and a two-month horizon made that error twice as large.
+
+test('everyday spending pulls the projection down by the rate per day', () => {
+  const flat = f.runway([], [], 1000, '2026-09-01', '2026-09-30', '2026-09-10');
+  const burnt = f.runway([], [], 1000, '2026-09-01', '2026-09-30', '2026-09-10', 10);
+  assert.strictEqual(flat.end, 1000, 'no orders and no burn means a flat line');
+  // 20 days from the 10th to the 30th, at 10 a day.
+  assert.strictEqual(burnt.end, 800);
+});
+
+test('a burn rate never turns a projection upward', () => {
+  const r = f.runway([], [], 500, '2026-09-01', '2026-09-30', '2026-09-10', -25);
+  assert.strictEqual(r.end, 500, 'a negative rate is refused, not added as income');
+});
+
+test('the projection subtracts the rate alongside standing orders', () => {
+  const orders = [{
+    id: 'o1', name: 'Rent', amount: 100, type: 'expense', accountId: 'a1',
+    generateFromDate: '2026-09-01', recurrenceRule: 'FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=20',
+  }];
+  const r = f.runway([], orders, 1000, '2026-09-01', '2026-09-30', '2026-09-10', 10);
+  assert.strictEqual(r.end, 700); // 1000 - 100 rent - 200 burn
+});
+
+// --- the day a budget goes over -------------------------------------------
+
+test('a budget names the day its limit is crossed', () => {
+  const b = {
+    id: 'b1', name: 'Groceries', accountIds: [], categoryIds: ['c1'], labelIds: [],
+    spending: { current: { spent: 90, effectiveLimit: 100, periodStart: '2026-09-01', periodEnd: '2026-09-30' } },
+  };
+  // 10 a day across the 9 elapsed days. The 10th brings it to exactly 100,
+  // and exactly at the limit is not over it, so the 11th is the day.
+  const records = Array.from({ length: 9 }, (_, i) => ({
+    id: `r${i}`, accountId: 'a1', category: { id: 'c1' }, labels: [],
+    recordDate: `2026-09-0${i + 1}T12:00:00Z`, convertedAmount: -10,
+  }));
+  const p = f.projectBudget(b, [], records, '2026-09-09');
+  assert.strictEqual(p.crossesOn, '2026-09-11');
+});
+
+test('a budget that lands inside its limit names no day', () => {
+  const b = {
+    id: 'b1', name: 'Rare', accountIds: [], categoryIds: ['c1'], labelIds: [],
+    spending: { current: { spent: 5, effectiveLimit: 1000, periodStart: '2026-09-01', periodEnd: '2026-09-30' } },
+  };
+  const records = [{ id: 'r1', accountId: 'a1', category: { id: 'c1' }, labels: [], recordDate: '2026-09-02T12:00:00Z', convertedAmount: -5 }];
+  assert.strictEqual(f.projectBudget(b, [], records, '2026-09-09').crossesOn, null);
+});
+
+test('a budget already past its limit names no day, because the day has gone', () => {
+  const b = {
+    id: 'b1', name: 'Blown', accountIds: [], categoryIds: ['c1'], labelIds: [],
+    spending: { current: { spent: 300, effectiveLimit: 100, periodStart: '2026-09-01', periodEnd: '2026-09-30' } },
+  };
+  const p = f.projectBudget(b, [], [], '2026-09-09');
+  assert.strictEqual(p.crossesOn, null);
+  assert.ok(p.spent > p.limit, 'the UI reads this pair instead');
+});

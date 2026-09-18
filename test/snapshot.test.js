@@ -188,3 +188,74 @@ test('records on an excluded account do not move the runway', () => {
   // Opening is 120: the a1 record is walked back out, the a2 record never was.
   assert.strictEqual(series[0].balance, 120);
 });
+
+// --- next month ------------------------------------------------------------
+// This month's closing balance is half an answer when rent and payday both
+// land on the far side of it.
+
+const eurAccount = (over) => ({
+  id: 'a1', name: 'A', balance: { currentBalance: 1000, currencyCode: 'EUR' }, recordStats: {}, ...over,
+});
+
+test('the line runs to the end of next month', () => {
+  const s = build(raw({ accounts: [eurAccount()] }), '2026-09-18');
+  const last = s.runway.projected[s.runway.projected.length - 1];
+  assert.strictEqual(last.date, '2026-10-31');
+  assert.strictEqual(s.nextMonth.start, '2026-10-01');
+  assert.strictEqual(s.nextMonth.end, '2026-10-31');
+});
+
+test('this month still has its own closing figure alongside the horizon', () => {
+  const s = build(raw({ accounts: [eurAccount()] }), '2026-09-18');
+  assert.strictEqual(s.runway.monthEndDate, '2026-09-30');
+  assert.strictEqual(s.runway.monthEnd, 1000);
+  assert.strictEqual(s.nextMonth.opening, s.runway.monthEnd, 'next month opens where this one closed');
+});
+
+test('next month closes on its opening plus what is planned, minus the rate', () => {
+  const orders = [
+    { id: 'o1', name: 'Payday', amount: 2000, type: 'income', accountId: 'a1', categoryId: 'c1',
+      generateFromDate: '2026-01-25', recurrenceRule: 'FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=25' },
+    { id: 'o2', name: 'Rent', amount: 800, type: 'expense', accountId: 'a1', categoryId: 'c2',
+      generateFromDate: '2026-01-01', recurrenceRule: 'FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=1' },
+  ];
+  const s = build(raw({ accounts: [eurAccount()], orders }), '2026-09-18');
+  const n = s.nextMonth;
+  assert.strictEqual(n.income, 2000);
+  assert.strictEqual(n.expense, 800);
+  assert.ok(Math.abs((n.opening + n.income - n.expense - n.burn) - n.closing) < 0.02,
+    `${n.opening} + ${n.income} - ${n.expense} - ${n.burn} should reach ${n.closing}`);
+});
+
+test('everyday spending reaches the line, so the far end is not just orders', () => {
+  const records = Array.from({ length: 30 }, (_, i) => ({
+    id: `r${i}`, accountId: 'a1', convertedAmount: -20,
+    recordDate: `2026-08-${String(i + 1).padStart(2, '0')}T12:00:00Z`,
+  }));
+  const s = build(raw({ accounts: [eurAccount()], records }), '2026-09-18');
+  assert.ok(s.burnPerDay > 0, 'a month of spending has a rate');
+  assert.ok(s.nextMonth.closing < s.nextMonth.opening,
+    'with no income planned, next month can only go down');
+});
+
+// --- records nobody has checked -------------------------------------------
+
+test('uncleared and waiting records are listed, checked ones are not', () => {
+  const records = [
+    { id: 'r1', accountId: 'a1', convertedAmount: -5, recordDate: '2026-09-17T10:00:00Z', recordState: 'uncleared', counterParty: 'Lidl' },
+    { id: 'r2', accountId: 'a1', convertedAmount: -6, recordDate: '2026-09-16T10:00:00Z', recordState: 'waitForAssign' },
+    { id: 'r3', accountId: 'a1', convertedAmount: -7, recordDate: '2026-09-15T10:00:00Z', recordState: 'cleared' },
+    { id: 'r4', accountId: 'a1', convertedAmount: -8, recordDate: '2026-09-14T10:00:00Z', recordState: 'reconciled' },
+  ];
+  const s = build(raw({ accounts: [eurAccount()], records }), '2026-09-18');
+  assert.deepStrictEqual(s.unchecked.map((r) => r.id), ['r1', 'r2'], 'newest first');
+  assert.strictEqual(s.unchecked[0].counterParty, 'Lidl');
+  assert.strictEqual(s.reviewStateSeen, true);
+});
+
+test('an account that never reports review state is told apart from a clean one', () => {
+  const records = [{ id: 'r1', accountId: 'a1', convertedAmount: -5, recordDate: '2026-09-17T10:00:00Z' }];
+  const s = build(raw({ accounts: [eurAccount()], records }), '2026-09-18');
+  assert.deepStrictEqual(s.unchecked, []);
+  assert.strictEqual(s.reviewStateSeen, false, 'the UI needs to say why the list is empty');
+});

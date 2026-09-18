@@ -1,8 +1,12 @@
 const { upcoming } = require('./rrule');
-const { projectBudget, runway, amountOf } = require('./forecast');
+const { projectBudget, runway, amountOf, discretionaryRate } = require('./forecast');
 
 const DAY = 86400000;
 const STALE_DAYS = 4;
+const RATE_DAYS = 60; // trailing window the everyday burn rate is averaged over
+// Wallet reports these two for a record nobody has confirmed yet: uncleared is
+// imported and untouched, waitForAssign is waiting on categorisation.
+const NEEDS_REVIEW = ['uncleared', 'waitForAssign'];
 const BASE_CURRENCY = 'EUR'; // matches the convertTo the API layer requests
 
 // Fixed across every Wallet account.
@@ -21,10 +25,10 @@ function fmt(ms) {
   return new Date(ms).toISOString().slice(0, 10);
 }
 
-function monthBounds(todayISO) {
+function monthBounds(todayISO, offset = 0) {
   const d = new Date(dayOf(todayISO));
   const y = d.getUTCFullYear();
-  const m = d.getUTCMonth();
+  const m = d.getUTCMonth() + offset;
   return { start: fmt(Date.UTC(y, m, 1)), end: fmt(Date.UTC(y, m + 1, 0)) };
 }
 
@@ -64,6 +68,17 @@ function build(rawData, todayISO) {
   const includedIds = new Set(included.map((a) => a.id));
   const balanceRecords = records.filter((r) => includedIds.has(r.accountId));
 
+  // Everyday spending: what is left once transfers, income and standing orders
+  // are taken out, averaged over a window long enough that one big Saturday
+  // does not become the forecast. It is the only term that carries the
+  // projection past the dates we already know.
+  const rateFrom = dayOf(todayISO) - RATE_DAYS * DAY;
+  const burn = discretionaryRate(
+    balanceRecords.filter((r) => dayOf(r.recordDate) >= rateFrom && dayOf(r.recordDate) <= dayOf(todayISO)),
+    orders,
+    RATE_DAYS,
+  );
+
   const total = included.reduce((sum, a) => sum + (Number(a.balance && a.balance.currentBalance) || 0), 0);
 
   // currentBalance is as of now, so walk this month's records backward to
@@ -91,11 +106,33 @@ function build(rawData, todayISO) {
       };
     });
 
+  // The line runs to the end of next month: this month's closing balance is
+  // only half an answer when rent and payday both land on the far side of it.
+  const next = monthBounds(todayISO, 1);
+  const line = runway(balanceRecords, orders, opening, start, next.end, todayISO, burn);
+  const balanceOn = (d) => {
+    const hit = line.projected.find((x) => x.date === d) || line.actual.find((x) => x.date === d);
+    return hit ? hit.balance : null;
+  };
+
+  const nextEvents = upcoming(orders, next.start, next.end);
+  const nextDays = Math.round((dayOf(next.end) - dayOf(next.start)) / DAY) + 1;
+
   return {
     generatedAt: new Date().toISOString(),
     today: todayISO,
     budgets: projected,
-    runway: runway(balanceRecords, orders, opening, start, end, todayISO),
+    runway: { ...line, monthEnd: balanceOn(end), monthEndDate: end },
+    burnPerDay: Math.round(burn * 100) / 100,
+    nextMonth: {
+      start: next.start,
+      end: next.end,
+      opening: balanceOn(end),
+      income: nextEvents.filter((e) => e.signed > 0).reduce((sum, e) => sum + e.signed, 0),
+      expense: nextEvents.filter((e) => e.signed < 0).reduce((sum, e) => sum - e.signed, 0),
+      burn: Math.round(burn * nextDays * 100) / 100,
+      closing: line.end,
+    },
     currency: BASE_CURRENCY,
     excludedAccounts,
     upcoming: upcoming(orders, todayISO, fmt(dayOf(todayISO) + 30 * DAY)),
@@ -106,6 +143,22 @@ function build(rawData, todayISO) {
       counterParty: r.counterParty || '',
       accountName: r.accountName || '',
     })),
+    // Records nobody has confirmed. Wallet only sends recordState on some
+    // payloads, so `reviewStateSeen` lets the UI tell "nothing to review" apart
+    // from "this account never reports review state".
+    unchecked: records
+      .filter((r) => NEEDS_REVIEW.includes(r.recordState) && Number.isFinite(dayOf(r.recordDate)))
+      .sort((a, b) => dayOf(b.recordDate) - dayOf(a.recordDate))
+      .slice(0, 50)
+      .map((r) => ({
+        id: r.id,
+        date: fmt(dayOf(r.recordDate)),
+        amount: amountOf(r.convertedAmount ?? r.amount),
+        counterParty: r.counterParty || '',
+        accountName: r.accountName || '',
+        state: r.recordState,
+      })),
+    reviewStateSeen: records.some((r) => typeof r.recordState === 'string'),
     sync,
     orders,
     rateLimit: rawData.rateLimit || { remaining: null, limit: null },

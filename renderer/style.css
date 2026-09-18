@@ -148,6 +148,35 @@ text.plot-end {
 }
 #verdict b.over { color: var(--signal); }
 
+/* The next-month line is arithmetic, so it is set like arithmetic: terms in
+   the reading weight, operators in the quiet one, the result carrying the
+   emphasis. Wraps to two lines at narrow widths rather than scrolling. */
+.next {
+  margin: 8px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 8px;
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.next .head {
+  color: var(--paper);
+  font-variation-settings: "wdth" 80;
+  font-weight: 500;
+  letter-spacing: .01em;
+}
+/* The operators are the argument, so they have to be readable as + - and =,
+   not as three identical dashes. */
+.next .op { color: var(--muted); font-size: 15px; }
+.next .close {
+  color: var(--paper);
+  font-weight: 600;
+  font-size: 15px;
+}
+.next .close.over { color: var(--signal); }
+
 /* ------------------------------------------------------------------- grid */
 
 .grid {

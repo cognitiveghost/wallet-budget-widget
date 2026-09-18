@@ -102,7 +102,7 @@ function projectBudget(budget, orders, records, todayISO) {
     : Number(budget.limit) || 0;
 
   if (!cur) {
-    return { spent: 0, scheduled: 0, discretionary: 0, projected: 0, limit, ratio: 0, overshoot: 0 };
+    return { spent: 0, scheduled: 0, discretionary: 0, projected: 0, limit, ratio: 0, overshoot: 0, crossesOn: null };
   }
 
   const start = cur.periodStart;
@@ -115,7 +115,7 @@ function projectBudget(budget, orders, records, todayISO) {
 
   if (remaining === 0) {
     const ratio = limit > 0 ? spent / limit : 0;
-    return { spent, scheduled: 0, discretionary: 0, projected: spent, limit, ratio, overshoot: Math.max(0, spent - limit) };
+    return { spent, scheduled: 0, discretionary: 0, projected: spent, limit, ratio, overshoot: Math.max(0, spent - limit), crossesOn: null };
   }
 
   // Scheduled: standing orders in this budget's scope that fall after today.
@@ -128,10 +128,30 @@ function projectBudget(budget, orders, records, todayISO) {
   const scopedRecords = (records || [])
     .filter((r) => inScope(budget, r))
     .filter((r) => dayOf(r.recordDate) >= dayOf(start) && dayOf(r.recordDate) <= dayOf(today));
-  const discretionary = discretionaryRate(scopedRecords, orders, elapsed) * remaining;
+  const rate = discretionaryRate(scopedRecords, orders, elapsed);
+  const discretionary = rate * remaining;
 
   const projected = spent + scheduled + discretionary;
   const ratio = limit > 0 ? projected / limit : 0;
+
+  // The day the limit is first passed, walked out day by day rather than
+  // divided out of the total: a rent payment on the 28th crosses on the 28th,
+  // and "over on the 26th" is a thing you can still act on. Null when the
+  // budget lands inside its limit, and when it is over already — spent and
+  // limit say that on their own.
+  let crossesOn = null;
+  if (limit > 0 && spent <= limit) {
+    const byDay = new Map();
+    for (const e of upcoming(scopedOrders, addDays(today, 1), end)) {
+      if (e.type === 'expense') byDay.set(e.date, (byDay.get(e.date) || 0) + e.amount);
+    }
+    let running = spent;
+    for (let ms = dayOf(today) + DAY; ms <= dayOf(end); ms += DAY) {
+      const d = fmt(ms);
+      running += (byDay.get(d) || 0) + rate;
+      if (running > limit) { crossesOn = d; break; }
+    }
+  }
 
   return {
     spent,
@@ -141,12 +161,18 @@ function projectBudget(budget, orders, records, todayISO) {
     limit,
     ratio,
     overshoot: Math.max(0, projected - limit),
+    crossesOn,
   };
 }
 
 // Daily balance series: measured up to today, arithmetic from today to the
-// period end. startBalance is the balance as of periodStart.
-function runway(records, orders, startBalance, periodStartISO, periodEndISO, todayISO) {
+// horizon. startBalance is the balance as of periodStartISO.
+//
+// burnPerDay is everyday spending — what is left after transfers, income and
+// standing orders are taken out. Without it the projection only ever books the
+// money it knows the date of, so the line drifts up and the further the
+// horizon runs the more it lies.
+function runway(records, orders, startBalance, periodStartISO, periodEndISO, todayISO, burnPerDay = 0) {
   const start = dayOf(periodStartISO);
   const end = dayOf(periodEndISO);
   const today = Math.min(dayOf(todayISO), end);
@@ -175,11 +201,12 @@ function runway(records, orders, startBalance, periodStartISO, periodEndISO, tod
     events.set(e.date, (events.get(e.date) || 0) + e.signed);
   }
 
+  const burn = Math.max(0, Number(burnPerDay) || 0);
   const projected = [{ date: fmt(today), balance: actual.length ? actual[actual.length - 1].balance : balance }];
   let p = projected[0].balance;
   for (let ms = today + DAY; ms <= end; ms += DAY) {
     const d = fmt(ms);
-    p += events.get(d) || 0;
+    p += (events.get(d) || 0) - burn;
     projected.push({ date: d, balance: Math.round(p * 100) / 100 });
   }
 

@@ -22,6 +22,8 @@ const dayMonth = (iso) => new Intl.DateTimeFormat(undefined, { day: 'numeric', m
 // next, and a list of due dates cannot afford that.
 const shortDate = dayMonth;
 
+const monthName = (iso) => new Intl.DateTimeFormat(undefined, { month: 'long', timeZone: 'UTC' }).format(asUTC(iso));
+
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 function el(tag, cls, text) {
@@ -96,10 +98,14 @@ function renderBudgets(root, snapshot) {
     row.append(track);
 
     const foot = el('div', 'bfoot');
-    foot.append(el('span', `lands${over ? ' over' : ''} num`,
-      over
-        ? `Lands at ${money0(b.projected)}, ${money0(b.overshoot)} over`
-        : `Lands at ${money0(b.projected)}`));
+    // "Over on the 26th" is something you can still act on; "lands at 540" is
+    // only a number. The date comes from walking the days, so a lump payment
+    // shows on its own day rather than smeared across the month.
+    let verdict = `Lands at ${money0(b.projected)}`;
+    if (over && b.spent > b.limit) verdict = `Already over by ${money0(b.spent - b.limit)}`;
+    else if (over && b.crossesOn) verdict = `Over on ${dayMonth(b.crossesOn)}, by ${money0(b.overshoot)}`;
+    else if (over) verdict = `Lands at ${money0(b.projected)}, ${money0(b.overshoot)} over`;
+    foot.append(el('span', `lands${over ? ' over' : ''} num`, verdict));
 
     // The three terms the projection is made of, shown rather than hidden in a
     // tooltip — a budget of pure subscriptions and a budget of pure burn rate
@@ -210,12 +216,64 @@ function renderRunway(root, snapshot) {
   svg.append(foot(PAD.l, dayMonth(points[0].date)));
   svg.append(foot(todayX, 'today', 'middle'));
 
+  // Where next month starts. The line runs across a month boundary now, so the
+  // boundary has to be visible or the far half reads as more of this month.
+  const nextStart = snapshot.nextMonth && snapshot.nextMonth.start;
+  const nextIdx = points.findIndex((pt) => pt.date === nextStart);
+  if (nextIdx > 0) {
+    const nx = x(nextIdx);
+    svg.append(svgEl('line', {
+      x1: nx, x2: nx, y1: PAD.t - 12, y2: H - PAD.b,
+      stroke: '#8a9099', 'stroke-width': 1, opacity: .25,
+    }));
+    svg.append(foot(nx + 5, monthName(nextStart)));
+
+    // This month's closing balance, read where it happens. Dropped when today
+    // is close enough that the two labels would sit on top of each other.
+    const mEnd = snapshot.runway.monthEndDate;
+    const mi = points.findIndex((pt) => pt.date === mEnd);
+    if (mi > 0 && x(mi) - todayX > 54) {
+      svg.append(svgEl('circle', { cx: x(mi), cy: y(points[mi].balance), r: 3, fill: '#8a9099' }));
+      svg.append(svgEl('text', {
+        x: x(mi), y: y(points[mi].balance) - 14, fill: '#8a9099', 'font-size': 12,
+        'text-anchor': 'middle', class: 'plot-now',
+      }, money0(points[mi].balance)));
+    }
+  }
+
+  // Over two months the end of the line stops being the worst news: payday
+  // lifts it back up and hides the week it nearly ran out. Mark the low point
+  // when it is meaningfully below where the line finishes, and skip it when
+  // the projection only ever falls — the end reading already is the low point.
+  const ahead = points.slice(actual.length - 1);
+  const low = ahead.reduce((a, b) => (b.balance < a.balance ? b : a), ahead[0]);
+  if (low.balance < end - span * 0.12 && low.balance >= 0) {
+    const lx = x(points.indexOf(low));
+    svg.append(svgEl('circle', { cx: lx, cy: y(low.balance), r: 3, fill: '#8a9099' }));
+    svg.append(svgEl('text', {
+      x: lx, y: y(low.balance) + 18, fill: '#8a9099', 'font-size': 12,
+      'text-anchor': 'middle', class: 'plot-now',
+    }, `low ${money0(low.balance)} ${dayMonth(low.date)}`));
+  }
+
+  // The one date worth interrupting for: when the line first goes under.
+  const broke = points.find((pt, i) => i >= actual.length - 1 && pt.balance < 0);
+  if (broke) {
+    const bx = x(points.indexOf(broke));
+    svg.append(svgEl('line', {
+      x1: bx, x2: bx, y1: y(0) - 7, y2: y(0) + 7, stroke: '#ff5c39', 'stroke-width': 2,
+    }));
+    svg.append(svgEl('text', {
+      x: bx + 6, y: y(0) + 16, fill: '#ff5c39', 'font-size': 12, class: 'plot-now',
+    }, `empty ${dayMonth(broke.date)}`));
+  }
+
   root.append(svg);
 }
 
 function renderVerdict(node, snapshot) {
   node.replaceChildren();
-  const { actual, projected, end } = snapshot.runway;
+  const { actual, end } = snapshot.runway;
   const over = snapshot.budgets.filter((b) => b.limit > 0 && b.ratio >= 1);
 
   // The end-of-month figure is already the largest thing on the screen. This
@@ -233,19 +291,44 @@ function renderVerdict(node, snapshot) {
     node.append(document.createTextNode(` ${over.length === 1 ? 'ends' : 'end'} over. `));
   }
 
+  // The verdict stays on this month; the line under it does next month. Both
+  // reading off the same end date would say the same thing twice.
   const today = actual.length ? actual[actual.length - 1].balance : end;
-  const delta = end - today;
-  const last = projected[projected.length - 1];
-  if (last && Math.abs(delta) >= 1) {
+  const monthEnd = snapshot.runway.monthEnd === null || snapshot.runway.monthEnd === undefined
+    ? end : snapshot.runway.monthEnd;
+  const delta = monthEnd - today;
+  if (Math.abs(delta) >= 1) {
     node.append(el('b', null, money0(Math.abs(delta))));
     node.append(document.createTextNode(
-      `${delta < 0 ? ' leaves' : ' arrives'} before ${dayMonth(last.date)}.`));
+      `${delta < 0 ? ' leaves' : ' arrives'} before ${dayMonth(snapshot.runway.monthEndDate)}.`));
   }
 
   if (snapshot.excludedAccounts && snapshot.excludedAccounts.length) {
     node.append(document.createTextNode(
       ` Not counting ${snapshot.excludedAccounts.join(', ')}, held in another currency.`));
   }
+}
+
+// Next month is arithmetic on this month's closing balance, so it is written
+// out as arithmetic: every term that moved the number is on the line.
+function renderNext(node, snapshot) {
+  node.replaceChildren();
+  const n = snapshot.nextMonth;
+  if (!n || n.opening === null) return;
+
+  const term = (label, value, cls) => {
+    node.append(el('span', `term ${cls || ''}`.trim(),
+      `${label} ${cls === 'op' ? '' : money0(Math.abs(value))}`.trim()));
+  };
+
+  node.append(el('span', 'term head', monthName(n.start)));
+  term('from', n.opening);
+  if (n.income > 0) { node.append(el('span', 'op', '+')); term('planned in', n.income); }
+  if (n.expense > 0) { node.append(el('span', 'op', '\u2212')); term('planned out', n.expense); }
+  if (n.burn > 0) { node.append(el('span', 'op', '\u2212')); term('at this rate', n.burn); }
+  node.append(el('span', 'op', '='));
+  node.append(el('b', `close num${n.closing < 0 ? ' over' : ''}`, money0(n.closing)));
+  node.append(el('span', 'term', `on ${dayMonth(n.end)}`));
 }
 
 // ----------------------------------------------------- upcoming / inbox / sync
@@ -269,19 +352,22 @@ function renderInbox(root, countEl, syncEl, snapshot) {
   root.replaceChildren();
   syncEl.replaceChildren();
 
-  countEl.textContent = snapshot.uncategorized.length || '';
+  const items = snapshot.unchecked || [];
+  countEl.textContent = items.length || '';
 
-  if (!snapshot.uncategorized.length) {
-    root.append(el('div', 'empty', 'Everything is categorized.'));
+  if (!items.length) {
+    root.append(el('div', 'empty', snapshot.reviewStateSeen === false
+      ? 'Wallet is not reporting review state for these accounts.'
+      : 'Every record has been checked.'));
   } else {
-    for (const r of snapshot.uncategorized) {
+    for (const r of items) {
       const row = el('div', 'row clickable');
       row.tabIndex = 0;
       row.append(el('span', 'd', shortDate(r.date)));
       row.append(el('span', 'n', r.counterParty || r.accountName || 'Record'));
       row.append(el('span', `a ${r.amount >= 0 ? 'pos' : ''}`, money(r.amount)));
       // Read-only by design: fixing a category happens in Wallet web.
-      row.title = 'Open Wallet web to categorize';
+      row.title = 'Open Wallet web to check this record';
       const open = () => window.api.openExternal('https://web.budgetbakers.com/records');
       row.addEventListener('click', open);
       row.addEventListener('keydown', (e) => { if (e.key === 'Enter') open(); });
@@ -331,6 +417,7 @@ function render(snapshot) {
 
   renderRunway($('runway'), snapshot);
   renderVerdict($('verdict'), snapshot);
+  renderNext($('next'), snapshot);
   renderBudgets($('budgets'), snapshot);
   renderUpcoming($('upcoming'), snapshot);
   renderInbox($('inbox'), $('inbox-n'), $('sync'), snapshot);
