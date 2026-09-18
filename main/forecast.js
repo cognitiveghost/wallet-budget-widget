@@ -55,73 +55,65 @@ function inScope(budget, item) {
   return true;
 }
 
-// The ids /standing-orders/items reports as having produced a record. This is
-// the fact; the heuristic below is the fallback for what it does not cover.
-function linkedRecordIds(items) {
-  const ids = new Set();
-  for (const it of items || []) for (const id of it.recordIds || []) ids.add(id);
-  return ids;
+// The rate is what history did that the calendar does not already account for.
+//
+// Deciding record by record whether something was a standing-order payment is
+// a guess, and every miss costs twice: the payment stays in the rate AND gets
+// added again as a payment still to come. So don't decide. Expand the same
+// RRULEs backwards over the measured window and subtract what they claim to
+// have produced. Whatever an order says it generates is removed at exactly the
+// rate it will be re-added going forward, so double counting is impossible by
+// construction — and an order that never actually fires simply pushes the rate
+// back up to compensate.
+function windowDays(fromISO, toISO) {
+  return Math.round((dayOf(toISO) - dayOf(fromISO)) / DAY) + 1;
 }
 
-// Attribute a record to a standing order so it can be excluded from the rate.
-// A miss here costs twice: the payment stays in the rate AND is added again as
-// a payment still to come, so the projection loses the same money two ways.
-// manualPayment orders produce hand-entered records that /standing-orders/items
-// never links, so the heuristic still has to cover them.
-// ponytail: amount+account+-3d window. It is the fallback now, not the rule.
-function isRecurring(record, orders, linked) {
-  if (linked && linked.has(record.id)) return true;
-  const amount = Math.abs(signedOf(record));
-  const when = dayOf(record.recordDate);
-  if (!Number.isFinite(when)) return false;
-
-  for (const o of orders || []) {
-    if (o.accountId && record.accountId && o.accountId !== record.accountId) continue;
-    const target = Math.abs(Number(o.amount) || 0);
-    if (target === 0) continue;
-    if (Math.abs(amount - target) / target > 0.01) continue;
-
-    const seed = o.generateFromDate || o.dueDate;
-    const near = occurrences(o.recurrenceRule, seed, fmt(when - 3 * DAY), fmt(when + 3 * DAY));
-    if (near.length) return true;
-  }
-  return false;
+function inWindow(record, fromISO, toISO) {
+  const ms = dayOf(record.recordDate);
+  return Number.isFinite(ms) && ms >= dayOf(fromISO) && ms <= dayOf(toISO);
 }
 
-// Mean daily spend of everything that is neither a transfer, nor income, nor
-// attributable to a standing order. Always a non-negative magnitude. Budgets
-// count expenses only — Wallet excludes income categories from a budget's
-// spending — so this stays gross.
-function discretionaryRate(records, orders, days, linked) {
-  if (!days || days <= 0) return 0;
-  let total = 0;
+// Mean daily change in balance from everything not already on the calendar.
+// Signed: a balance moves on net flow, so money arriving off-schedule counts
+// as much as money leaving. Extrapolating only the outgoings while counting
+// nothing incoming but scheduled income walks every projection to zero whether
+// or not the account is really draining.
+function netRate(records, orders, fromISO, toISO) {
+  const days = windowDays(fromISO, toISO);
+  if (days <= 0) return 0;
+
+  let actual = 0;
   for (const r of records || []) {
     if (r.transfer) continue;
+    if (!inWindow(r, fromISO, toISO)) continue;
+    actual += signedOf(r);
+  }
+  const scheduled = upcoming(orders, fromISO, toISO).reduce((sum, e) => sum + e.signed, 0);
+  return (actual - scheduled) / days;
+}
+
+// The same calibration for one budget's scope. Budgets count expenses only —
+// Wallet leaves income categories out of a budget's spending — so this stays
+// gross, and never goes below zero: a budget cannot spend backwards.
+function discretionaryRate(records, orders, fromISO, toISO) {
+  const days = windowDays(fromISO, toISO);
+  if (days <= 0) return 0;
+
+  let gross = 0;
+  for (const r of records || []) {
+    if (r.transfer) continue;
+    if (!inWindow(r, fromISO, toISO)) continue;
     const v = signedOf(r);
-    if (v >= 0) continue; // income and zero-value records
-    if (isRecurring(r, orders, linked)) continue;
-    total += -v;
+    if (v < 0) gross += -v;
   }
-  return total / days;
+  const scheduled = upcoming(orders, fromISO, toISO)
+    .filter((e) => e.type === 'expense')
+    .reduce((sum, e) => sum + e.amount, 0);
+  return Math.max(0, gross - scheduled) / days;
 }
 
-// Mean daily change in balance from everything not already on the calendar:
-// signed, so money that arrives counts as much as money that leaves. A balance
-// moves on net flow, and extrapolating only the outgoings while counting
-// nothing but scheduled income marches every projection to zero regardless of
-// whether the account is actually draining.
-function netRate(records, orders, days, linked) {
-  if (!days || days <= 0) return 0;
-  let total = 0;
-  for (const r of records || []) {
-    if (r.transfer) continue;
-    if (isRecurring(r, orders, linked)) continue;
-    total += signedOf(r);
-  }
-  return total / days;
-}
-
-function projectBudget(budget, orders, records, todayISO, linked) {
+function projectBudget(budget, orders, records, todayISO) {
   const cur = (budget.spending && budget.spending.current) || null;
   const spent = cur ? Number(cur.spent) || 0 : 0;
   const limit = cur && cur.effectiveLimit != null
@@ -145,17 +137,16 @@ function projectBudget(budget, orders, records, todayISO, linked) {
     return { spent, scheduled: 0, discretionary: 0, projected: spent, limit, ratio, overshoot: Math.max(0, spent - limit), crossesOn: null };
   }
 
-  // Scheduled: standing orders in this budget's scope that fall after today.
   const scopedOrders = (orders || []).filter((o) => inScope(budget, o));
+
+  // Scheduled: standing orders in this budget's scope that fall after today.
   const scheduled = upcoming(scopedOrders, addDays(today, 1), end)
     .filter((e) => e.type === 'expense')
     .reduce((sum, e) => sum + e.amount, 0);
 
   // Discretionary: rate derived only from this budget's own scoped records.
-  const scopedRecords = (records || [])
-    .filter((r) => inScope(budget, r))
-    .filter((r) => dayOf(r.recordDate) >= dayOf(start) && dayOf(r.recordDate) <= dayOf(today));
-  const rate = discretionaryRate(scopedRecords, orders, elapsed, linked);
+  const scopedRecords = (records || []).filter((r) => inScope(budget, r));
+  const rate = discretionaryRate(scopedRecords, scopedOrders, start, today);
   const discretionary = rate * remaining;
 
   const projected = spent + scheduled + discretionary;
@@ -241,4 +232,4 @@ function runway(records, orders, startBalance, periodStartISO, periodEndISO, tod
   return { actual, projected, end: projected[projected.length - 1].balance };
 }
 
-module.exports = { inScope, isRecurring, linkedRecordIds, discretionaryRate, netRate, projectBudget, runway, amountOf };
+module.exports = { inScope, discretionaryRate, netRate, projectBudget, runway, amountOf };

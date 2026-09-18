@@ -57,7 +57,7 @@ for (let d = -74; d <= 0; d += 1) {
   const perDay = 1 + Math.floor(rnd() * 3);
   for (let i = 0; i < perDay; i += 1) {
     const categoryId = pick([CAT.groceries, CAT.groceries, CAT.eating, CAT.transport, CAT.fun]);
-    const value = -Math.round((2 + rnd() * 46) * 100) / 100;
+    const value = -Math.round((2 + rnd() * 70) * 100) / 100;
     records.push({
       id: `r${n += 1}`,
       accountId: rnd() > 0.15 ? 'a1' : 'a2',
@@ -77,10 +77,10 @@ for (let d = -74; d <= 0; d += 1) {
   }
 }
 
-// Salary lands as a record too, linked back to the order that generated it so
-// it is not counted twice. Plus the shared-cost half that comes back a few
-// days later, which nothing schedules — the term that used to be invisible.
-const orderItems = [];
+// Salary lands as a record too. The rate subtracts what the order claims for
+// the same window, so it is not counted twice. Plus the shared-cost half that
+// comes back a few days later, which nothing schedules — the term that used to
+// be invisible.
 for (const back of [-54, -24]) {
   const id = `r-pay${back}`;
   records.push({
@@ -89,7 +89,6 @@ for (const back of [-54, -24]) {
     category: { id: 'c-inc' }, categoryId: 'c-inc', labels: [],
     counterParty: 'Payroll', accountName: 'Revolut', recordState: 'cleared', transfer: null,
   });
-  orderItems.push({ standingOrderId: 'o1', recordIds: [id] });
 }
 for (const [back, value] of [[-46, 210], [-31, 185], [-12, 240]]) {
   records.push({
@@ -148,7 +147,7 @@ const uncategorized = records
   .filter((r) => r.category.id.startsWith('5c5c32'))
   .map((r) => ({ ...r }));
 
-const snapshot = build({ budgets, orders, accounts, records, uncategorized, orderItems }, TODAY);
+const snapshot = build({ budgets, orders, accounts, records, uncategorized }, TODAY);
 snapshot.generatedAt = '2026-09-18T14:32:00Z';
 
 const out = path.join(__dirname, 'fixture-snapshot.js');

@@ -275,21 +275,38 @@ test('off-schedule income keeps the line from marching to zero', () => {
     'nothing scheduled and no drift means the balance stays put');
 });
 
-test('a standing order the link claims is left out of the rate', () => {
+test('a bill bigger than the order that scheduled it is not counted twice', () => {
   const orders = [{
     id: 'o1', name: 'Bill', amount: 60, type: 'expense', accountId: 'a1', categoryId: 'c1',
     generateFromDate: '2026-01-10', recurrenceRule: 'FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=10',
   }];
-  // Billed 88, not the 60 the order says, so only the link can attribute it.
-  const records = [{ id: 'bill-88', accountId: 'a1', recordDate: '2026-09-10T12:00:00Z', convertedAmount: -88 }];
-  const loose = build(raw({ accounts: [eurAccount()], orders, records }), '2026-09-18');
-  const tied = build(raw({
-    accounts: [eurAccount()], orders, records,
-    orderItems: [{ standingOrderId: 'o1', recordIds: ['bill-88'] }],
-  }), '2026-09-18');
+  // Billed 88 against an order of 60. The old amount match decided this was
+  // not that payment and charged the projection twice: 88 in the rate, and
+  // the order again on its next date.
+  const records = [
+    { id: 'bill-aug', accountId: 'a1', recordDate: '2026-08-10T12:00:00Z', convertedAmount: -88 },
+    { id: 'bill-sep', accountId: 'a1', recordDate: '2026-09-10T12:00:00Z', convertedAmount: -88 },
+  ];
+  const s = build(raw({ accounts: [eurAccount()], orders, records }), '2026-09-18');
 
-  assert.ok(loose.ratePerDay < 0, 'unlinked, the bill is everyday spending as well as a payment due');
-  assert.strictEqual(tied.ratePerDay, 0);
-  assert.ok(tied.nextMonth.closing > loose.nextMonth.closing,
-    'counting it once instead of twice leaves more money at the end');
+  // The window holds two occurrences of the order and the two bills that paid
+  // them: 176 went out, 120 of it was already on the calendar, so only the 56
+  // of excess is rate. Counted twice it would have been the whole 176.
+  assert.ok(Math.abs(s.ratePerDay - (-56 / 61)) < 0.01, `rate was ${s.ratePerDay}`);
+});
+
+test('a standing order on an excluded account stays off the line', () => {
+  // Its records never reach balanceRecords, so its occurrences must not reach
+  // the projection either, or the two halves stop reconciling.
+  const accounts = [
+    { id: 'a1', name: 'A', balance: { currentBalance: 1000, currencyCode: 'EUR' }, recordStats: {} },
+    { id: 'czk', name: 'CZK', balance: { currentBalance: 500, currencyCode: 'CZK' }, recordStats: {} },
+  ];
+  const orders = [{
+    id: 'o1', name: 'Czech rent', amount: 400, type: 'expense', accountId: 'czk', categoryId: 'c1',
+    generateFromDate: '2026-01-01', recurrenceRule: 'FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=5',
+  }];
+  const s = build(raw({ accounts, orders }), '2026-09-18');
+  assert.strictEqual(s.nextMonth.expense, 0);
+  assert.strictEqual(s.nextMonth.closing, 1000);
 });

@@ -16,8 +16,8 @@ async function cycle({ api, onSnapshot, onError }) {
   try {
     const t = today();
     const { start, end } = monthBounds(t);
-    const [budgets, orders, accounts, orderItems] = await Promise.all([
-      api.budgets(), api.standingOrders(), api.accounts(), api.standingOrderItems(),
+    const [budgets, orders, accounts] = await Promise.all([
+      api.budgets(), api.standingOrders(), api.accounts(),
     ]);
     // 90 days of history feeds the discretionary rate; the runway needs only
     // this month, and the wider window is a superset of it.
@@ -33,7 +33,7 @@ async function cycle({ api, onSnapshot, onError }) {
     // ponytail: 90 days back. A yearly budget still sees a partial period;
     // widen the window if yearly budgets turn out to matter.
     onSnapshot(build({
-      budgets, orders, accounts, records, uncategorized, orderItems,
+      budgets, orders, accounts, records, uncategorized,
       rateLimit: api.rateLimit(),
     }, t));
   } catch (err) {

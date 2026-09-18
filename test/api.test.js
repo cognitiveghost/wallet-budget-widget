@@ -170,16 +170,3 @@ test('the request carries an abort signal', async () => {
   await api.accounts();
   assert.ok(seen && typeof seen.addEventListener === 'function');
 });
-
-test('standing-order items come back under their own envelope key', async () => {
-  const log = [];
-  const api = createApi({
-    token: 'a.b.c',
-    fetchImpl: fakeFetch({ '/standing-orders/items': {
-      body: { agentHints: [], standingOrderItems: [{ standingOrderId: 'o1', recordIds: ['r1'] }] },
-    } }, log),
-  });
-  const items = await api.standingOrderItems();
-  assert.deepStrictEqual(items, [{ standingOrderId: 'o1', recordIds: ['r1'] }]);
-  assert.ok(log[0].url.includes('/standing-orders/items'), log[0].url);
-});

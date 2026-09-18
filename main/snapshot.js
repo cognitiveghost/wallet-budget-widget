@@ -1,5 +1,5 @@
 const { upcoming } = require('./rrule');
-const { projectBudget, runway, amountOf, netRate, linkedRecordIds } = require('./forecast');
+const { projectBudget, runway, amountOf, netRate } = require('./forecast');
 
 const DAY = 86400000;
 const STALE_DAYS = 4;
@@ -33,12 +33,11 @@ function monthBounds(todayISO, offset = 0) {
 }
 
 function build(rawData, todayISO) {
-  const { budgets = [], orders = [], accounts = [], records = [], uncategorized = [], orderItems = [] } = rawData;
-  const linked = linkedRecordIds(orderItems);
+  const { budgets = [], orders = [], accounts = [], records = [], uncategorized = [] } = rawData;
   const { start, end } = monthBounds(todayISO);
 
   const projected = budgets.map((b) => {
-    const p = projectBudget(b, orders, records, todayISO, linked);
+    const p = projectBudget(b, orders, records, todayISO);
     const cur = (b.spending && b.spending.current) || {};
     return {
       id: b.id,
@@ -69,18 +68,15 @@ function build(rawData, todayISO) {
   const includedIds = new Set(included.map((a) => a.id));
   const balanceRecords = records.filter((r) => includedIds.has(r.accountId));
 
-  // Everyday net flow: everything that moves the balance and is not already on
-  // the calendar, averaged over a window long enough that one big Saturday
-  // does not become the forecast. Signed on purpose — counting only what goes
-  // out, while counting nothing coming in but scheduled income, walks every
-  // projection to zero whether or not the account is really draining.
-  const rateFrom = dayOf(todayISO) - RATE_DAYS * DAY;
-  const rate = netRate(
-    balanceRecords.filter((r) => dayOf(r.recordDate) >= rateFrom && dayOf(r.recordDate) <= dayOf(todayISO)),
-    orders,
-    RATE_DAYS,
-    linked,
-  );
+  // Standing orders on an account the balance does not include would be added
+  // to a line their records never reach. Same rule as the records: one set of
+  // accounts, or the two halves do not reconcile.
+  const balanceOrders = orders.filter((o) => !o.accountId || includedIds.has(o.accountId));
+
+  // Everyday net flow: what the last RATE_DAYS did that the calendar does not
+  // already account for, averaged over a window long enough that one big
+  // Saturday does not become the forecast.
+  const rate = netRate(balanceRecords, balanceOrders, fmt(dayOf(todayISO) - RATE_DAYS * DAY), todayISO);
 
   const total = included.reduce((sum, a) => sum + (Number(a.balance && a.balance.currentBalance) || 0), 0);
 
@@ -112,13 +108,13 @@ function build(rawData, todayISO) {
   // The line runs to the end of next month: this month's closing balance is
   // only half an answer when rent and payday both land on the far side of it.
   const next = monthBounds(todayISO, 1);
-  const line = runway(balanceRecords, orders, opening, start, next.end, todayISO, rate);
+  const line = runway(balanceRecords, balanceOrders, opening, start, next.end, todayISO, rate);
   const balanceOn = (d) => {
     const hit = line.projected.find((x) => x.date === d) || line.actual.find((x) => x.date === d);
     return hit ? hit.balance : null;
   };
 
-  const nextEvents = upcoming(orders, next.start, next.end);
+  const nextEvents = upcoming(balanceOrders, next.start, next.end);
   const nextDays = Math.round((dayOf(next.end) - dayOf(next.start)) / DAY) + 1;
 
   return {

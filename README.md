@@ -90,11 +90,21 @@ order for — counts exactly as much as money leaving. Extrapolating only the
 outgoings while counting nothing incoming but scheduled income walks every
 projection to zero whether or not the account is really draining.
 
-Which records are already on the calendar is a fact, not a guess:
-`/standing-orders/items` links each generated record to the order that produced
-it. The old amount-and-date heuristic is the fallback for manual payments the
-link does not cover. A miss there costs twice — the payment stays in the rate
-*and* is added again as a payment still to come.
+Nothing is classified record by record. Deciding whether a given record was a
+standing-order payment is a guess, and every miss costs twice: the payment
+stays in the rate *and* is added again as a payment still to come. So instead
+the same RRULEs are expanded **backwards** over the measured window and
+subtracted from what actually happened:
+
+```
+rate = (net flow over the window - what the orders claim for that window) / days
+```
+
+Whatever an order says it generates leaves the rate at exactly the rate it will
+be re-added going forward, so double counting is impossible by construction. A
+bill that comes in higher than its order leaves only the excess. An order that
+never actually fires pushes the rate back up to compensate, instead of the
+projection quietly losing the money.
 
 Two months in view moves where the news is. The end of the line stops being
 the worst point once payday lifts it again, so the low point in between is
@@ -118,5 +128,5 @@ irregular spending.
   as one it got right; only an unconfirmed record is visible.
 - **No server-side aggregation.** Rollups are computed locally from `/records`.
 - **Rate limit.** 300 requests/hour sustained. The default 5-minute poll uses
-  six requests per cycle before paging — roughly 72/hour — and backs off
+  five requests per cycle before paging — roughly 60/hour — and backs off
   automatically when the remaining budget is low.

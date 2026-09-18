@@ -85,11 +85,6 @@ function createApi({ token, fetchImpl }) {
       convertTo: 'EUR',
       sortBy: '-recordDate',
     }),
-    // Links generated records to the standing order that produced them. Without
-    // it, deciding whether a record is a recurring payment is a guess from its
-    // amount and date, and every miss gets counted twice: once in the rate,
-    // once again as a payment still to come.
-    standingOrderItems: () => paged('/standing-orders/items', 'standingOrderItems', {}),
     rateLimit: () => ({ remaining, limit }),
   };
 }

@@ -26,7 +26,6 @@ test('spending from before this month still feeds a long budget period', async (
       spending: { current: { spent: 300, effectiveLimit: 1000, periodStart, periodEnd } },
     }],
     standingOrders: async () => [],
-    standingOrderItems: async () => [],
     accounts: async () => [{ id: 'a1', name: 'A', balance: { currentBalance: 0, currencyCode: 'EUR' }, recordStats: {} }],
     records: async (params) => (params.categoryId ? [] : [
       { id: 'r1', accountId: 'a1', convertedAmount: -300, recordDate: `${oldRecord}T12:00:00Z` },

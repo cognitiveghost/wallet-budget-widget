@@ -54,67 +54,58 @@ test('a record nests its category under category.id', () => {
   assert.strictEqual(f.inScope(b, rec(-10)), true);
 });
 
-// ------------------------------------------------------------ isRecurring
+// ----------------------------------------------- the rate, against the calendar
+// The rate is what the window did that the standing orders do not already
+// account for. Nothing is classified record by record: the same RRULEs are
+// expanded backwards over the measured window and subtracted, so whatever an
+// order claims to generate leaves the rate at exactly the rate it will be
+// re-added going forward.
 
-test('a record matching an order amount, account and date is recurring', () => {
+const WIN = ['2026-09-01', '2026-09-30']; // 30 days inclusive
+
+test('the discretionary rate averages expenses over the window', () => {
+  assert.strictEqual(f.discretionaryRate([rec(-30), rec(-60)], [], ...WIN), 3);
+});
+
+test('income is left out of the discretionary rate', () => {
+  assert.strictEqual(f.discretionaryRate([rec(-30), rec(900)], [], ...WIN), 1);
+});
+
+test('what the calendar already claims is subtracted from the rate', () => {
+  // The order says it produced 50 on the 25th, so only the other 30 is rate.
   const o = order({ amount: 50 });
-  assert.strictEqual(f.isRecurring(rec(-50, { recordDate: '2026-09-25T09:00:00Z' }), [o]), true);
+  assert.strictEqual(f.discretionaryRate([rec(-30), rec(-50, { recordDate: '2026-09-25T09:00:00Z' })], [o], ...WIN), 1);
 });
 
-test('a record three days off a scheduled date still counts as that payment', () => {
+test('a bill that came in higher than its order leaves only the excess', () => {
+  // The heuristic this replaced saw 88 against an order of 60, decided it was
+  // not that payment, and counted the whole 88 in the rate as well as adding
+  // the order again on its next date.
+  const o = order({ amount: 60 });
+  const bill = rec(-88, { recordDate: '2026-09-25T09:00:00Z' });
+  assert.strictEqual(f.discretionaryRate([bill], [o], ...WIN), 28 / 30);
+});
+
+test('an order that never actually fired pushes the rate back up, not below zero', () => {
   const o = order({ amount: 50 });
-  assert.strictEqual(f.isRecurring(rec(-50, { recordDate: '2026-09-27T09:00:00Z' }), [o]), true);
+  assert.strictEqual(f.discretionaryRate([], [o], ...WIN), 0, 'a budget cannot spend backwards');
 });
 
-test('a record four days off a scheduled date is not attributed', () => {
-  const o = order({ amount: 50 });
-  assert.strictEqual(f.isRecurring(rec(-50, { recordDate: '2026-09-29T09:00:00Z' }), [o]), false);
+test('transfers are left out of the discretionary rate', () => {
+  assert.strictEqual(f.discretionaryRate([rec(-30), rec(-500, { transfer: { id: 't1' } })], [], ...WIN), 1);
 });
 
-test('a different amount on the right day is not attributed', () => {
-  const o = order({ amount: 50 });
-  assert.strictEqual(f.isRecurring(rec(-80, { recordDate: '2026-09-25T09:00:00Z' }), [o]), false);
+test('records outside the window do not count toward it', () => {
+  const old = rec(-300, { recordDate: '2026-07-04T09:00:00Z' });
+  assert.strictEqual(f.discretionaryRate([rec(-30), old], [], ...WIN), 1);
 });
 
-test('amounts within one percent are treated as the same payment', () => {
-  const o = order({ amount: 100 });
-  assert.strictEqual(f.isRecurring(rec(-100.5, { recordDate: '2026-09-25T09:00:00Z' }), [o]), true);
-});
-
-test('a different account on the right day and amount is not attributed', () => {
-  const o = order({ amount: 50, accountId: 'other' });
-  assert.strictEqual(f.isRecurring(rec(-50, { recordDate: '2026-09-25T09:00:00Z' }), [o]), false);
-});
-
-// ------------------------------------------------------- discretionaryRate
-
-test('the discretionary rate averages non-recurring expenses over the window', () => {
-  const rs = [rec(-30), rec(-60)];
-  assert.strictEqual(f.discretionaryRate(rs, [], 30), 3);
-});
-
-test('income is excluded from the discretionary rate', () => {
-  const rs = [rec(-30), rec(900)];
-  assert.strictEqual(f.discretionaryRate(rs, [], 30), 1);
-});
-
-test('records attributable to standing orders are excluded', () => {
-  const o = order({ amount: 50 });
-  const rs = [rec(-30), rec(-50, { recordDate: '2026-09-25T09:00:00Z' })];
-  assert.strictEqual(f.discretionaryRate(rs, [o], 30), 1);
-});
-
-test('transfers are excluded from the discretionary rate', () => {
-  const rs = [rec(-30), rec(-500, { transfer: { id: 't1' } })];
-  assert.strictEqual(f.discretionaryRate(rs, [], 30), 1);
-});
-
-test('a zero-day window yields a zero rate rather than dividing by zero', () => {
-  assert.strictEqual(f.discretionaryRate([rec(-30)], [], 0), 0);
+test('a backwards window yields a zero rate rather than dividing by zero', () => {
+  assert.strictEqual(f.discretionaryRate([rec(-30)], [], '2026-09-30', '2026-09-01'), 0);
 });
 
 test('no records yields a zero rate', () => {
-  assert.strictEqual(f.discretionaryRate([], [], 30), 0);
+  assert.strictEqual(f.discretionaryRate([], [], ...WIN), 0);
 });
 
 // -------------------------------------------------------- projectBudget
@@ -308,52 +299,34 @@ test('a budget already past its limit names no day, because the day has gone', (
   assert.ok(p.spent > p.limit, 'the UI reads this pair instead');
 });
 
-// --- the rate is net, and recurrence is a fact ----------------------------
-// Two bugs found against live data. Extrapolating only the outgoings while
-// counting nothing incoming but scheduled income walked the balance to zero
-// on an account that was actually break-even; and every standing order the
-// amount-and-date heuristic missed was counted twice, once in the rate and
-// again as a payment still to come.
-
-const on = (d, over) => ({ id: `r-${d}`, accountId: 'a1', recordDate: `2026-09-${d}T12:00:00Z`, ...over });
+// --- the rate is net ------------------------------------------------------
+// Checked against live data: two months of records netting to roughly
+// break-even were projecting -644 a month, because every euro out was
+// extrapolated while euros in counted only when a standing order scheduled
+// them.
 
 test('the net rate counts money arriving, not only money leaving', () => {
-  const records = [on('01', { convertedAmount: -300 }), on('02', { convertedAmount: 300 })];
-  assert.strictEqual(f.netRate(records, [], 10), 0, 'a month that breaks even has no drift');
-  assert.strictEqual(f.discretionaryRate(records, [], 10), 30, 'budgets still see gross spend');
+  const records = [rec(-300, { recordDate: '2026-09-02T12:00:00Z' }), rec(300, { recordDate: '2026-09-03T12:00:00Z' })];
+  assert.strictEqual(f.netRate(records, [], ...WIN), 0, 'a window that breaks even has no drift');
+  assert.strictEqual(f.discretionaryRate(records, [], ...WIN), 10, 'budgets still see gross spend');
 });
 
 test('an account taking in more than it spends has a positive rate', () => {
-  const records = [on('01', { convertedAmount: -100 }), on('02', { convertedAmount: 400 })];
-  assert.strictEqual(f.netRate(records, [], 10), 30);
+  const records = [rec(-100), rec(400)];
+  assert.strictEqual(f.netRate(records, [], ...WIN), 10);
 });
 
-test('a linked record is recurring however far its amount has drifted', () => {
-  const order = {
-    id: 'o1', name: 'Electricity', amount: 60, type: 'expense', accountId: 'a1',
-    generateFromDate: '2026-01-10', recurrenceRule: 'FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=10',
-  };
-  // A variable bill: 88 is nowhere near the order's 60, so the heuristic misses
-  // it and the payment would be counted in the rate as well as on the calendar.
-  const bill = { id: 'rec-88', accountId: 'a1', recordDate: '2026-09-10T12:00:00Z', convertedAmount: -88 };
-  assert.strictEqual(f.isRecurring(bill, [order]), false, 'the heuristic alone cannot see it');
-
-  const linked = f.linkedRecordIds([{ standingOrderId: 'o1', recordIds: ['rec-88'] }]);
-  assert.strictEqual(f.isRecurring(bill, [order], linked), true);
-  assert.strictEqual(f.netRate([bill], [order], 10, linked), 0, 'and so it leaves the rate');
+test('scheduled income is subtracted from the net rate, not counted twice', () => {
+  // Payday lands on the 25th and is also a standing order, so the rate that
+  // carries the projection forward must not carry payday forward as well.
+  const pay = order({ amount: 900, type: 'income' });
+  const records = [rec(900, { recordDate: '2026-09-25T12:00:00Z' }), rec(-300)];
+  assert.strictEqual(f.netRate(records, [pay], ...WIN), -10);
 });
 
-test('the heuristic still covers records the link does not', () => {
-  const order = {
-    id: 'o1', name: 'Rent', amount: 500, type: 'expense', accountId: 'a1',
-    generateFromDate: '2026-01-01', recurrenceRule: 'FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=1',
-  };
-  const paid = { id: 'manual', accountId: 'a1', recordDate: '2026-09-01T12:00:00Z', convertedAmount: -500 };
-  assert.strictEqual(f.isRecurring(paid, [order], f.linkedRecordIds([])), true);
-});
-
-test('linkedRecordIds survives items with no records attached yet', () => {
-  const ids = f.linkedRecordIds([{ standingOrderId: 'o1' }, { standingOrderId: 'o2', recordIds: ['r1'] }]);
-  assert.strictEqual(ids.has('r1'), true);
-  assert.strictEqual(ids.size, 1);
+test('an unpaid scheduled expense pushes the net rate up to compensate', () => {
+  // The order claims 50 went out and it never did. The rate carries that
+  // correction forward rather than the projection quietly losing the money.
+  const o = order({ amount: 50 });
+  assert.strictEqual(f.netRate([], [o], ...WIN), 50 / 30);
 });
