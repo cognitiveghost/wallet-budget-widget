@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { createApi } = require('../main/api');
+const { createApi, listOf } = require('../main/api');
 
 // Minimal fetch double. `routes` maps a URL substring to a response spec.
 function fakeFetch(routes, log = []) {
@@ -96,4 +96,47 @@ test('records accepts a category filter', async () => {
   const api = createApi({ token: 'a.b.c', fetchImpl: fakeFetch({ '/records': { body: { records: [] } } }, log) });
   await api.records({ from: '2026-09-01', to: '2026-09-30', categoryId: 'cat1,cat2' });
   assert.ok(log[0].url.includes('categoryId=cat1%2Ccat2'));
+});
+
+// --- envelope regressions --------------------------------------------------
+// agentHints is an array and is serialised before the data key for budgets,
+// records and standing-orders, so "first array" returned the hints instead.
+
+test('listOf prefers the named key over agentHints', () => {
+  const body = { agentHints: [{ type: 'pagination.has_more' }], budgets: [{ id: 'b1' }] };
+  assert.deepEqual(listOf(body, 'budgets'), [{ id: 'b1' }]);
+});
+
+test('listOf returns empty, not hints, when the named key is absent', () => {
+  assert.deepEqual(listOf({ agentHints: [{ type: 'x' }] }, 'budgets'), []);
+});
+
+test('listOf still handles a bare array body', () => {
+  assert.deepEqual(listOf([{ id: 'a' }], 'accounts'), [{ id: 'a' }]);
+});
+
+test('budgets reads the budgets key past leading agentHints', async () => {
+  const api = createApi({
+    token: 't',
+    fetchImpl: async () => ({
+      ok: true, status: 200, headers: { get: () => null },
+      json: async () => ({ agentHints: [{ type: 'x' }], budgets: [{ id: 'b1' }, { id: 'b2' }] }),
+    }),
+  });
+  assert.equal((await api.budgets()).length, 2);
+});
+
+test('paged stops instead of looping forever when offset is ignored', async () => {
+  let calls = 0;
+  const full = Array.from({ length: 200 }, (_, i) => ({ id: `r${i}` }));
+  const api = createApi({
+    token: 't',
+    fetchImpl: async () => {
+      calls += 1;
+      return { ok: true, status: 200, headers: { get: () => null }, json: async () => ({ records: full }) };
+    },
+  });
+  const out = await api.records({ from: '2026-01-01', to: '2026-01-31' });
+  assert.equal(calls, 100);
+  assert.equal(out.length, 20000);
 });

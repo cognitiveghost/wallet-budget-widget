@@ -222,16 +222,37 @@ function render(snapshot) {
 window.api.onSnapshot(render);
 
 window.api.onStatus(({ state, message }) => {
-  if (state === 'needs-token') showGate(message);
-  else if (state === 'error' && !lastSnapshot) showGate('Could not reach Wallet.', message);
+  if (state === 'needs-token') { showGate(message); resetSave(); }
+  // Without this branch the click produced no visible change at all while the
+  // first poll ran, which reads as a dead button.
+  else if (state === 'loading' && !lastSnapshot) showGate('Connecting to Wallet…', '');
+  else if (state === 'ok') resetSave();
+  else if (state === 'error' && !lastSnapshot) { showGate('Could not reach Wallet.', message); resetSave(); }
   else if (state === 'error') $('stamp').textContent = `stale — ${message}`;
 });
 
+function resetSave() {
+  $('save').disabled = false;
+  $('save').textContent = 'Connect';
+}
+
 $('save').addEventListener('click', async () => {
   const token = $('token').value.trim();
-  const res = await window.api.saveToken(token);
-  if (!res.ok) $('gate-err').textContent = res.message;
-  else $('token').value = '';
+  $('save').disabled = true;
+  $('save').textContent = 'Connecting…';
+  try {
+    const res = await window.api.saveToken(token);
+    if (!res || !res.ok) {
+      $('gate-err').textContent = (res && res.message) || 'Could not save the token.';
+      resetSave();
+    } else {
+      $('token').value = '';
+    }
+  } catch (err) {
+    // An IPC rejection used to surface as nothing whatsoever.
+    $('gate-err').textContent = err && err.message ? err.message : String(err);
+    resetSave();
+  }
 });
 
 $('token').addEventListener('keydown', (e) => {
