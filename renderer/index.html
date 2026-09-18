@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:;">
+  <title>Wallet Budget</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <section id="gate" hidden>
+    <div class="gate-card">
+      <h1>Wallet Budget</h1>
+      <p id="gate-msg">Paste your Wallet API token to begin.</p>
+      <p class="hint">Wallet web &rarr; Settings &rarr; API. Requires Premium.</p>
+      <input id="token" type="password" placeholder="Paste API token" autocomplete="off" spellcheck="false">
+      <button id="save">Connect</button>
+      <p id="gate-err" class="err"></p>
+    </div>
+  </section>
+
+  <main id="dash" hidden>
+    <header>
+      <h1>Wallet Budget</h1>
+      <span id="stamp"></span>
+      <button id="refresh">Refresh</button>
+    </header>
+    <div class="grid">
+      <section class="panel budgets"><h2>Budgets <span id="period"></span></h2><div id="budgets"></div></section>
+      <section class="panel runway"><h2>Runway</h2><div id="runway"></div></section>
+      <section class="panel inbox"><h2>Needs category <span id="inbox-n"></span></h2><div id="inbox"></div><div id="sync"></div></section>
+      <section class="panel upcoming"><h2>Upcoming</h2><div id="upcoming"></div></section>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
