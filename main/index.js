@@ -42,7 +42,12 @@ function onError(err) {
     send('status', { state: 'needs-token', message: 'Your API token was rejected. Paste a fresh one from Wallet web settings.' });
     return;
   }
-  send('status', { state: 'error', message: err && err.message ? err.message : 'Request failed.' });
+  // Node's fetch reports network failures as a bare "fetch failed" and hides
+  // the real reason (DNS, TLS, proxy) on .cause — surface it or the gate line
+  // says nothing actionable.
+  const cause = err && err.cause && err.cause.message;
+  const detail = err && err.message ? err.message : 'Request failed.';
+  send('status', { state: 'error', message: cause ? `${detail} (${cause})` : detail });
 }
 
 function startPolling() {

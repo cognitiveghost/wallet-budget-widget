@@ -21,9 +21,16 @@ function addDays(iso, n) {
   return fmt(dayOf(iso) + n * DAY);
 }
 
+// The API returns money as {currencyCode, value}; older payloads used a bare
+// number. Accept both rather than silently reading every amount as 0.
+function amountOf(v) {
+  if (v && typeof v === 'object') return Number(v.value) || 0;
+  return Number(v) || 0;
+}
+
 function signedOf(record) {
   const v = record.convertedAmount;
-  return Number(v === undefined || v === null ? record.amount : v) || 0;
+  return amountOf(v === undefined || v === null ? record.amount : v);
 }
 
 // A budget's scope is three ID sets combined with AND. An empty set means that
@@ -147,7 +154,11 @@ function runway(records, orders, startBalance, periodStartISO, periodEndISO, tod
   const perDay = new Map();
   for (const r of records || []) {
     if (r.transfer) continue;
-    const d = fmt(dayOf(r.recordDate));
+    const ms = dayOf(r.recordDate);
+    // An undated record cannot sit on a day-by-day series; dropping it beats
+    // throwing `Invalid time value` out of the whole poll cycle.
+    if (!Number.isFinite(ms)) continue;
+    const d = fmt(ms);
     perDay.set(d, (perDay.get(d) || 0) + signedOf(r));
   }
 
@@ -175,4 +186,4 @@ function runway(records, orders, startBalance, periodStartISO, periodEndISO, tod
   return { actual, projected, end: projected[projected.length - 1].balance };
 }
 
-module.exports = { inScope, isRecurring, discretionaryRate, projectBudget, runway };
+module.exports = { inScope, isRecurring, discretionaryRate, projectBudget, runway, amountOf };

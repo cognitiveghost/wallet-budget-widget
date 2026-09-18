@@ -1,5 +1,5 @@
 const { upcoming } = require('./rrule');
-const { projectBudget, runway } = require('./forecast');
+const { projectBudget, runway, amountOf } = require('./forecast');
 
 const DAY = 86400000;
 const STALE_DAYS = 4;
@@ -54,18 +54,21 @@ function build(rawData, todayISO) {
   // recover the opening balance the runway starts from.
   const monthNet = records
     .filter((r) => !r.transfer && dayOf(r.recordDate) >= dayOf(start) && dayOf(r.recordDate) <= dayOf(todayISO))
-    .reduce((sum, r) => sum + (Number(r.convertedAmount ?? r.amount) || 0), 0);
+    .reduce((sum, r) => sum + amountOf(r.convertedAmount ?? r.amount), 0);
   const opening = total - monthNet;
 
   const sync = accounts
     .filter((a) => a.isBankSync)
     .map((a) => {
       const last = a.recordStats && a.recordStats.recordDate && a.recordStats.recordDate.max;
-      const ageDays = last ? Math.round((dayOf(todayISO) - dayOf(last)) / DAY) : null;
+      // `last` can be present but unparseable, so test the parse, not the field.
+      const lastMs = dayOf(last);
+      const dated = Number.isFinite(lastMs);
+      const ageDays = dated ? Math.round((dayOf(todayISO) - lastMs) / DAY) : null;
       return {
         id: a.id,
         name: a.name,
-        lastRecord: last ? fmt(dayOf(last)) : null,
+        lastRecord: dated ? fmt(lastMs) : null,
         ageDays,
         error: (a.recordStats && a.recordStats.error) || null,
         stale: ageDays !== null && ageDays >= STALE_DAYS,
@@ -78,10 +81,10 @@ function build(rawData, todayISO) {
     budgets: projected,
     runway: runway(records, orders, opening, start, end, todayISO),
     upcoming: upcoming(orders, todayISO, fmt(dayOf(todayISO) + 30 * DAY)),
-    uncategorized: uncategorized.map((r) => ({
+    uncategorized: uncategorized.filter((r) => Number.isFinite(dayOf(r.recordDate))).map((r) => ({
       id: r.id,
       date: fmt(dayOf(r.recordDate)),
-      amount: Number(r.convertedAmount ?? r.amount) || 0,
+      amount: amountOf(r.convertedAmount ?? r.amount),
       counterParty: r.counterParty || '',
       accountName: r.accountName || '',
     })),

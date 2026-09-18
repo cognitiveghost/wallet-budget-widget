@@ -230,3 +230,16 @@ test('a today past the period end yields no projected leg beyond the end', () =>
   assert.strictEqual(r.projected.length, 1);
   assert.strictEqual(r.end, r.actual[r.actual.length - 1].balance);
 });
+
+// --- live API shape regressions -------------------------------------------
+
+test('runway skips records with an unparseable recordDate', () => {
+  const records = [{ recordDate: null, convertedAmount: { value: -5 } }];
+  assert.doesNotThrow(() => f.runway(records, [], 100, '2026-09-01', '2026-09-30', '2026-09-18'));
+});
+
+test('signed amount reads the {value} object the API returns', () => {
+  const records = [{ recordDate: '2026-09-02T00:00:00.000Z', convertedAmount: { currencyCode: 'EUR', value: -40 } }];
+  const r = f.runway(records, [], 100, '2026-09-01', '2026-09-30', '2026-09-18');
+  assert.equal(r.actual[1].balance, 60);
+});

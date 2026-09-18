@@ -118,3 +118,33 @@ test('an empty account produces a snapshot rather than throwing', () => {
   assert.deepStrictEqual(s.upcoming, []);
   assert.ok(s.runway);
 });
+
+// --- live API shape regressions -------------------------------------------
+// The Wallet API returns amounts as {currencyCode, value} and can emit records
+// whose recordDate is absent or unparseable. Both reached `build` unguarded.
+
+test('build survives a record with no recordDate', () => {
+  const r = { id: 'r1', accountId: 'a1', convertedAmount: { currencyCode: 'EUR', value: -5 } };
+  assert.doesNotThrow(() => build(raw({ records: [r] }), '2026-09-18'));
+});
+
+test('build survives an uncategorized record with no recordDate', () => {
+  const r = { id: 'r1', accountId: 'a1', convertedAmount: { currencyCode: 'EUR', value: -5 } };
+  const snap = build(raw({ uncategorized: [r] }), '2026-09-18');
+  assert.equal(snap.uncategorized.length, 0);
+});
+
+test('build survives an account whose last record date is unparseable', () => {
+  const a = { id: 'a1', name: 'Bank', isBankSync: true, balance: { currentBalance: 10 },
+    recordStats: { recordDate: { max: 'N/A' } } };
+  const snap = build(raw({ accounts: [a] }), '2026-09-18');
+  assert.equal(snap.sync[0].lastRecord, null);
+  assert.equal(snap.sync[0].ageDays, null);
+});
+
+test('build reads the object amount shape the API actually returns', () => {
+  const r = { id: 'r1', accountId: 'a1', recordDate: '2026-09-10T09:00:00.000Z',
+    convertedAmount: { currencyCode: 'EUR', value: -12.5 } };
+  const snap = build(raw({ uncategorized: [r] }), '2026-09-18');
+  assert.equal(snap.uncategorized[0].amount, -12.5);
+});
