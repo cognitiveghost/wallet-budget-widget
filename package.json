@@ -1,6 +1,6 @@
 {
   "name": "wallet-budget-widget",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Desktop dashboard for BudgetBakers Wallet budgets, standing orders and projections",
   "main": "main/index.js",
