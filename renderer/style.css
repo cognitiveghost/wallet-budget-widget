@@ -1,177 +1,401 @@
+/* Archivo, variable on both weight and width. The width axis is the hierarchy
+   here: figures run expanded, prose runs normal. One family, two voices. */
+@font-face {
+  font-family: Archivo;
+  src: url("fonts/archivo-latin.woff2") format("woff2");
+  font-weight: 300 700;
+  font-stretch: 62% 125%;
+  font-display: block;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: Archivo;
+  src: url("fonts/archivo-latin-ext.woff2") format("woff2");
+  font-weight: 300 700;
+  font-stretch: 62% 125%;
+  font-display: block;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
 :root {
-  --bg: #11131a;
-  --panel: #191d27;
-  --line: #262c3a;
-  --text: #e6e9f0;
-  --dim: #8b93a7;
-  --ok: #4ade80;
-  --warn: #fbbf24;
-  --bad: #f87171;
-  --accent: #60a5fa;
+  --ink: #16171a;
+  --surface: #1d1f23;
+  --track: #24272c;
+  --rule: #2c3036;
+  --paper: #e9eaec;
+  --muted: #8a9099;
+
+  /* Colour is reserved for the three terms of a projection, plus overshoot.
+     Anything that is merely fine stays uncoloured. */
+  --measure: #6fd0ba;  /* already spent, recorded */
+  --promise: #d7a94b;  /* standing orders still to land */
+  --signal: #ff5c39;   /* past the limit */
+
+  --gap: 18px;
+  --limit-stop: 74%;   /* where every budget's limit mark sits in its track */
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font: 14px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: Archivo, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+  font-variation-settings: "wdth" 100;
+  line-height: 1.45;
   height: 100vh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  font-variation-settings: "wdth" 112;
+  letter-spacing: -0.005em;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  clip-path: inset(50%);
   overflow: hidden;
 }
 
-header {
-  display: flex;
-  align-items: baseline;
-  gap: 16px;
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--line);
+:focus-visible {
+  outline: 2px solid var(--measure);
+  outline-offset: 2px;
 }
 
-header h1 { font-size: 15px; font-weight: 600; margin: 0; letter-spacing: .2px; }
-header #stamp { color: var(--dim); font-size: 12px; font-variant-numeric: tabular-nums; }
+/* ------------------------------------------------------------------ chrome */
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 24px;
+  height: 52px;
+  border-bottom: 1px solid var(--rule);
+}
+
+header h1 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  font-variation-settings: "wdth" 76;
+  letter-spacing: 0.03em;
+}
+
+#stamp {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+#stamp.stale { color: var(--signal); }
+
 header button { margin-left: auto; }
 
 button {
-  background: var(--panel);
-  color: var(--text);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 6px 14px;
+  background: transparent;
+  color: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 6px 16px;
   cursor: pointer;
   font: inherit;
+  font-size: 13px;
+  transition: border-color .12s, color .12s;
 }
-button:hover { border-color: var(--accent); }
+button:hover:not(:disabled) { border-color: var(--measure); color: var(--measure); }
+button:disabled { color: var(--muted); cursor: default; }
+
+/* ------------------------------------------------------------------ runway */
+
+/* The hero is the plot itself, bled to the window edges, with the end-of-month
+   reading annotated where the line actually stops. */
+.runway {
+  padding: 18px 24px 16px;
+  border-bottom: 1px solid var(--rule);
+}
+
+/* Set here, not as a style attribute: the renderer runs under style-src 'self',
+   which refuses inline style attributes outright. */
+text.plot-now { font-variation-settings: "wdth" 108; font-variant-numeric: tabular-nums; }
+text.plot-end {
+  font-variation-settings: "wdth" 112;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+#runway svg { display: block; width: 100%; height: 198px; overflow: visible; }
+
+#verdict {
+  margin: 10px 0 0;
+  font-size: 15px;
+  max-width: 80ch;
+  color: var(--muted);
+}
+#verdict b {
+  color: var(--paper);
+  font-weight: 500;
+}
+#verdict b.over { color: var(--signal); }
+
+/* ------------------------------------------------------------------- grid */
 
 .grid {
   display: grid;
-  grid-template-columns: 1.35fr 1fr;
-  grid-template-rows: 1fr 1fr;
-  gap: 14px;
-  padding: 14px 20px 20px;
-  height: calc(100vh - 53px);
+  grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr);
+  gap: var(--gap);
+  padding: var(--gap) 24px 24px;
+  height: calc(100vh - 52px - 258px);
 }
 
-@media (max-width: 1100px) {
-  .grid { grid-template-columns: 1fr; grid-template-rows: none; height: auto; overflow-y: auto; }
-  body { overflow: auto; }
-}
-
-.panel {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 14px 16px;
-  overflow: auto;
+.side {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1.45fr);
+  gap: var(--gap);
   min-height: 0;
 }
 
+.panel {
+  --fade: linear-gradient(to bottom, #000 calc(100% - 26px), transparent 100%);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 16px 18px 14px;
+  overflow: auto;
+  min-height: 0;
+  scrollbar-gutter: stable;
+}
+.panel.scrolls { mask-image: var(--fade); }
+
 .panel h2 {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: .09em;
-  color: var(--dim);
-  margin: 0 0 12px;
+  margin: 0 0 16px;
+  font-size: 14px;
   font-weight: 600;
+  font-variation-settings: "wdth" 76;
+  letter-spacing: 0.012em;
+  color: var(--paper);
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+.panel h2 span {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  margin-left: auto;
 }
 
-.panel h2 span { color: var(--dim); font-weight: 400; text-transform: none; letter-spacing: 0; }
+/* ---------------------------------------------------------------- budgets */
 
-/* ---------------------------------------------------------- budget rows */
-
-.brow { margin-bottom: 13px; }
+.brow { padding-bottom: 18px; }
+.brow:last-child { padding-bottom: 2px; }
 
 .btop {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: 10px;
-  margin-bottom: 4px;
+  gap: 12px;
+  margin-bottom: 11px;
 }
 
 .bname { font-weight: 500; }
-.bnum { color: var(--dim); font-size: 12px; font-variant-numeric: tabular-nums; }
-.bproj { font-variant-numeric: tabular-nums; font-size: 12px; }
-.bproj.over { color: var(--bad); font-weight: 600; }
-.bproj.near { color: var(--warn); }
-.bproj.safe { color: var(--dim); }
+.bspent { color: var(--muted); font-size: 13px; }
+.bspent em { font-style: normal; color: var(--paper); }
 
-/* The bar shows what is spent; the tick shows where the projection lands, so
-   "under now, over by month end" reads as one glance rather than two numbers. */
-.bar {
+/* The track carries all three terms of the projection end to end, and the
+   limit sits at the same place in every row so the whole column reads as one
+   graduated scale rather than a stack of unrelated bars. */
+.track {
   position: relative;
-  height: 7px;
-  background: #0d0f15;
-  border-radius: 4px;
-  overflow: visible;
+  height: 10px;
+  background: var(--track);
+  border-radius: 2px;
 }
 
-.fill {
-  height: 100%;
-  border-radius: 4px;
-  background: var(--ok);
-  transition: width .25s;
-}
-.fill.near { background: var(--warn); }
-.fill.over { background: var(--bad); }
-
-.tick {
+.seg {
   position: absolute;
-  top: -3px;
-  width: 2px;
-  height: 13px;
-  background: var(--text);
-  border-radius: 1px;
+  top: 0;
+  height: 100%;
+  border-radius: 2px;
 }
-.tick.over { background: var(--bad); }
+.seg.spent { background: var(--measure); }
+.seg.spent.over { background: var(--signal); }
+.seg.due { background: var(--promise); }
+.seg.rate {
+  border-radius: 0 2px 2px 0;
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(138, 144, 153, .55) 0 2px,
+    transparent 2px 5px
+  );
+}
 
-/* ------------------------------------------------------------- lists */
+.limit {
+  position: absolute;
+  z-index: 1;
+  top: -7px;
+  bottom: -7px;
+  left: var(--limit-stop);
+  width: 1px;
+  background: var(--paper);
+  opacity: .8;
+}
+/* The graduation carries a cap so it reads as a mark on a scale rather than
+   as a gap in the bar. */
+.limit::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -2px;
+  width: 5px;
+  height: 2px;
+  background: var(--paper);
+}
+
+.limit.crossed { background: var(--signal); }
+.limit.crossed::before { background: var(--signal); }
+
+/* The overshoot is exactly the run of bar past the graduation, so that run is
+   what gets marked — the segment colours underneath still say which of the
+   three terms pushed it there. */
+.spill {
+  position: absolute;
+  top: -6px;
+  height: 3px;
+  background: var(--signal);
+  border-radius: 2px;
+}
+
+.bfoot {
+  display: flex;
+  gap: 14px;
+  margin-top: 9px;
+  font-size: 12px;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+.bfoot .lands { color: var(--paper); }
+.bfoot .lands.over { color: var(--signal); }
+.bfoot i { font-style: normal; }
+.bfoot .k-spent { color: var(--measure); }
+.bfoot .k-due { color: var(--promise); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .seg { animation: reveal .45s cubic-bezier(.22, 1, .36, 1) both; }
+}
+@keyframes reveal {
+  from { opacity: 0; transform: translateX(-6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ------------------------------------------------------------------ lists */
 
 .row {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   align-items: baseline;
-  padding: 5px 0;
-  border-bottom: 1px solid var(--line);
+  padding: 6px 0;
+  border-bottom: 1px solid var(--rule);
   font-variant-numeric: tabular-nums;
 }
 .row:last-child { border-bottom: 0; }
-.row .d { color: var(--dim); font-size: 12px; min-width: 42px; }
+.row .d { color: var(--muted); font-size: 12px; min-width: 44px; }
 .row .n { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.row .a { font-weight: 500; }
-.row .a.pos { color: var(--ok); }
-.row .a.neg { color: var(--text); }
-.row.clickable { cursor: pointer; }
-.row.clickable:hover { background: #1f2430; }
+.row .a { margin-left: auto; font-variation-settings: "wdth" 112; }
+.row .a.pos { color: var(--measure); }
+.row.clickable { cursor: pointer; margin: 0 -8px; padding-inline: 8px; border-radius: 3px; }
+.row.clickable:hover { background: var(--track); }
 
-.empty { color: var(--dim); font-size: 12px; padding: 6px 0; }
+.empty { color: var(--muted); font-size: 13px; padding: 4px 0; }
 
-#sync { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
-.sync-row { display: flex; gap: 8px; font-size: 12px; padding: 3px 0; }
-.sync-row .ok { color: var(--ok); }
-.sync-row .stale { color: var(--warn); }
-.sync-row .bad { color: var(--bad); }
+#sync {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--rule);
+}
+.sync-head {
+  font-size: 14px;
+  font-weight: 600;
+  font-variation-settings: "wdth" 76;
+  letter-spacing: 0.012em;
+  color: var(--paper);
+  margin-bottom: 8px;
+}
+.sync-row {
+  display: flex;
+  gap: 10px;
+  font-size: 12px;
+  padding: 4px 0;
+  color: var(--muted);
+}
+.sync-row .n { flex: 1; color: var(--paper); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sync-row .stale { color: var(--promise); }
+.sync-row .bad { color: var(--signal); }
 
-/* -------------------------------------------------------------- gate */
+/* ------------------------------------------------------------------- gate */
 
-[hidden] { display: none !important; }
+#gate { display: grid; place-items: center; height: 100vh; padding: 24px; }
 
-#gate { display: grid; place-items: center; height: 100vh; }
-.gate-card { width: 380px; text-align: center; }
-.gate-card h1 { font-size: 18px; margin: 0 0 12px; }
-.gate-card p { color: var(--dim); margin: 0 0 8px; }
-.gate-card .hint { font-size: 12px; margin-bottom: 18px; }
+.gate-card { width: 340px; }
+.gate-card h1 {
+  font-size: 26px;
+  font-weight: 600;
+  font-variation-settings: "wdth" 78;
+  margin: 0 0 10px;
+  letter-spacing: -0.01em;
+}
+.gate-card p { color: var(--muted); margin: 0 0 20px; }
+.gate-card label {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
 .gate-card input {
   width: 100%;
-  padding: 9px 12px;
-  background: #0d0f15;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  color: var(--text);
+  padding: 10px 12px;
+  background: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  color: var(--paper);
   font: inherit;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
-.gate-card input:focus { outline: none; border-color: var(--accent); }
-.gate-card button { width: 100%; }
-.err { color: var(--bad); font-size: 12px; min-height: 16px; }
+.gate-card input::placeholder { color: #5b6069; }
+.gate-card input:focus-visible { border-color: var(--measure); outline: none; }
+.gate-card button { width: 100%; padding: 9px; }
+.err { color: var(--signal); font-size: 13px; min-height: 19px; margin: 8px 0 0; }
+.gate-card .hint { font-size: 12px; margin: 14px 0 0; }
+
+/* --------------------------------------------------------------- narrower */
+
+@media (max-width: 1080px) {
+  body { overflow: auto; height: auto; }
+  .grid {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+  .side { grid-template-rows: none; }
+  .panel { overflow: visible; }
+}
+
+/* ------------------------------------------------------------- scrollbars */
+
+.panel::-webkit-scrollbar { width: 9px; }
+.panel::-webkit-scrollbar-thumb {
+  background: var(--rule);
+  border-radius: 5px;
+  border: 2px solid var(--surface);
+}
+.panel::-webkit-scrollbar-track { background: transparent; }

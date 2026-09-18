@@ -1,10 +1,16 @@
 <!doctype html>
+<!-- Design harness: the real renderer, driven by a fixed snapshot. Open it in a
+     browser to look at the dashboard without a Wallet token or an Electron
+     window. Not shipped: electron-builder packs renderer/, not test/. -->
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <!-- Same policy as renderer/index.html: without it the harness quietly
+       accepts style attributes the real window refuses. -->
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:;">
-  <title>Wallet Budget</title>
+        content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self'; font-src 'self'; img-src 'self' data:;">
+  <title>Wallet Budget — preview</title>
+  <base href="../renderer/">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -38,7 +44,6 @@
         <h2>Budgets <span id="period"></span></h2>
         <div id="budgets"></div>
       </section>
-
       <div class="side">
         <section class="panel">
           <h2>Due next 30 days</h2>
@@ -53,6 +58,24 @@
     </div>
   </main>
 
+  <script src="../test/fixture-snapshot.js"></script>
+  <script>
+    let onSnap = () => {};
+    window.api = {
+      onSnapshot: (cb) => { onSnap = cb; },
+      onStatus: () => {},
+      saveToken: async () => ({ ok: true }),
+      refresh: async () => new Promise((r) => setTimeout(r, 900)),
+      openExternal: () => {},
+    };
+  </script>
   <script src="app.js"></script>
+  <script>
+    onSnap(window.FIXTURE);
+    if (location.hash === '#gate') {
+      document.getElementById('dash').hidden = true;
+      document.getElementById('gate').hidden = false;
+    }
+  </script>
 </body>
 </html>

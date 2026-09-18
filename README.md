@@ -7,6 +7,8 @@ due and budgets crossing their limits.
 
 Read-only. It never modifies Wallet data.
 
+![The dashboard](docs/design/dashboard.png)
+
 ## Setup
 
 Requires a Wallet **Premium** subscription. Generate a personal API token in
@@ -33,7 +35,29 @@ npm test
 ```
 
 Tests cover the pure modules — `rrule`, `forecast`, `alerts`, `snapshot`,
-`store`, `secrets`, `api`. The Electron shell is not tested.
+`poll`, `store`, `secrets`, `api` — plus two rules the renderer has to keep:
+the `[hidden]` override, and no style attributes anywhere (the window runs
+under `style-src 'self'`, which refuses them without an error the user can
+see). The Electron shell itself is not tested.
+
+## Looking at the UI
+
+`test/preview.html` is the real renderer driven by a fixed snapshot in
+`test/fixture-snapshot.js`, under the same content policy as the real window.
+Open it in a browser to work on the dashboard without a token. It is not
+packaged — `electron-builder` ships `renderer/`, not `test/`.
+
+## Reading the budget rows
+
+Each row is one scale. The graduation is that budget's limit, and it sits at
+the same place in every row, so the column reads top to bottom as a single
+instrument. The bar runs the three terms of the projection end to end —
+solid for what is spent, brass for standing orders still to land, hatched for
+what the current rate adds — and stops where the month is projected to end.
+A bar that crosses the graduation is a budget that ends over, and the run past
+it is marked.
+
+Type is Archivo, bundled in `renderer/fonts/`. Nothing is fetched at runtime.
 
 ## How the projection works
 
