@@ -26,10 +26,14 @@ async function cycle({ api, onSnapshot, onError }) {
     const records = await api.records({ from, to: end });
     const uncategorized = await api.records({ from, to: end, categoryId: UNCATEGORIZED.join(',') });
 
+    // The full window goes through untrimmed. Every consumer in build() does
+    // its own date filtering, and budgets on a quarterly or yearly period need
+    // history older than this month or their discretionary rate divides a
+    // month of spending by a year of days and projects almost nothing.
+    // ponytail: 90 days back. A yearly budget still sees a partial period;
+    // widen the window if yearly budgets turn out to matter.
     onSnapshot(build({
-      budgets, orders, accounts,
-      records: records.filter((r) => r.recordDate >= start),
-      uncategorized,
+      budgets, orders, accounts, records, uncategorized,
       rateLimit: api.rateLimit(),
     }, t));
   } catch (err) {

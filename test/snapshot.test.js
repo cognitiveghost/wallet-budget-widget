@@ -148,3 +148,43 @@ test('build reads the object amount shape the API actually returns', () => {
   const snap = build(raw({ uncategorized: [r] }), '2026-09-18');
   assert.equal(snap.uncategorized[0].amount, -12.5);
 });
+
+// --- account scoping -------------------------------------------------------
+// Balances are in each account's own currency while records arrive converted
+// to EUR, so a non-EUR balance cannot join the runway's sum.
+
+test('archived and excluded accounts stay out of the runway total', () => {
+  const accounts = [
+    { id: 'a1', name: 'A', balance: { currentBalance: 60, currencyCode: 'EUR' }, recordStats: {} },
+    { id: 'a2', name: 'Old', archived: true, balance: { currentBalance: 500, currencyCode: 'EUR' }, recordStats: {} },
+    { id: 'a3', name: 'Shared', excludeFromStats: true, balance: { currentBalance: 900, currencyCode: 'EUR' }, recordStats: {} },
+  ];
+  const s = build(raw({ accounts }), '2026-09-18');
+  assert.strictEqual(s.runway.actual[s.runway.actual.length - 1].balance, 60);
+});
+
+test('a foreign-currency account is dropped from the total and named', () => {
+  const accounts = [
+    { id: 'a1', name: 'A', balance: { currentBalance: 60, currencyCode: 'EUR' }, recordStats: {} },
+    { id: 'a2', name: 'Revolut CZK', balance: { currentBalance: 9000, currencyCode: 'CZK' }, recordStats: {} },
+  ];
+  const s = build(raw({ accounts }), '2026-09-18');
+  assert.strictEqual(s.runway.actual[s.runway.actual.length - 1].balance, 60);
+  assert.deepStrictEqual(s.excludedAccounts, ['Revolut CZK']);
+});
+
+test('records on an excluded account do not move the runway', () => {
+  const accounts = [
+    { id: 'a1', name: 'A', balance: { currentBalance: 100, currencyCode: 'EUR' }, recordStats: {} },
+    { id: 'a2', name: 'CZK', balance: { currentBalance: 0, currencyCode: 'CZK' }, recordStats: {} },
+  ];
+  const records = [
+    { id: 'r1', accountId: 'a1', convertedAmount: -20, recordDate: '2026-09-05T12:00:00Z' },
+    { id: 'r2', accountId: 'a2', convertedAmount: -400, recordDate: '2026-09-06T12:00:00Z' },
+  ];
+  const s = build(raw({ accounts, records }), '2026-09-18');
+  const series = s.runway.actual;
+  assert.strictEqual(series[series.length - 1].balance, 100);
+  // Opening is 120: the a1 record is walked back out, the a2 record never was.
+  assert.strictEqual(series[0].balance, 120);
+});

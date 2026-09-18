@@ -58,22 +58,23 @@ function decide(snapshot, notified, todayISO) {
   }
 
   // --- budget thresholds --------------------------------------------------
+  // Fields come from the flattened snapshot budget, not the raw Wallet payload:
+  // build() hoists spending.current onto the row, so reading b.spending here
+  // silently skipped every budget and no budget alert ever fired.
   for (const b of snapshot.budgets || []) {
-    const cur = b.spending && b.spending.current;
-    if (!cur) continue;
-    const limit = Number(cur.effectiveLimit) || 0;
+    const limit = Number(b.limit) || 0;
     if (limit <= 0) continue;
-    const pct = (Number(cur.spent) || 0) / limit;
+    const pct = (Number(b.spent) || 0) / limit;
 
     if (pct >= 1) {
-      emit(`budget:${b.id}:${cur.periodStart}:100`,
+      emit(`budget:${b.id}:${b.periodStart}:100`,
         `${b.name} is over budget`,
-        `${money(cur.spent)} of ${money(limit)} — ${Math.round(pct * 100)}%`);
+        `${money(b.spent)} of ${money(limit)} — ${Math.round(pct * 100)}%`);
     }
     if (pct >= 0.8) {
-      emit(`budget:${b.id}:${cur.periodStart}:80`,
+      emit(`budget:${b.id}:${b.periodStart}:80`,
         `${b.name} past 80%`,
-        `${money(cur.spent)} of ${money(limit)} — ${Math.round(pct * 100)}%`);
+        `${money(b.spent)} of ${money(limit)} — ${Math.round(pct * 100)}%`);
     }
   }
 

@@ -3,6 +3,7 @@ const { projectBudget, runway, amountOf } = require('./forecast');
 
 const DAY = 86400000;
 const STALE_DAYS = 4;
+const BASE_CURRENCY = 'EUR'; // matches the convertTo the API layer requests
 
 // Fixed across every Wallet account.
 const UNCATEGORIZED = [
@@ -48,11 +49,26 @@ function build(rawData, todayISO) {
   // Worst news first — whatever is about to go wrong rises to the top.
   projected.sort((a, b) => (b.overshoot - a.overshoot) || (b.ratio - a.ratio));
 
-  const total = accounts.reduce((sum, a) => sum + (Number(a.balance && a.balance.currentBalance) || 0), 0);
+  // The runway is one line of money, so its balances and its records have to
+  // come from the same set of accounts. Archived and excluded-from-stats
+  // accounts are out because Wallet leaves them out of its own totals; other
+  // currencies are out because records arrive converted to EUR while balances
+  // do not, and the API exposes no converted balance. Dropping those accounts
+  // and naming them beats adding a CZK balance to a EUR line.
+  const currencyOf = (a) => (a.balance && a.balance.currencyCode) || a.currencyCode || BASE_CURRENCY;
+  const active = accounts.filter((a) => !a.archived && !a.excludeFromStats);
+  const included = active.filter((a) => currencyOf(a) === BASE_CURRENCY);
+  const excludedAccounts = active.filter((a) => currencyOf(a) !== BASE_CURRENCY).map((a) => a.name);
+
+  // A record on no included account cannot reconcile against these balances.
+  const includedIds = new Set(included.map((a) => a.id));
+  const balanceRecords = records.filter((r) => includedIds.has(r.accountId));
+
+  const total = included.reduce((sum, a) => sum + (Number(a.balance && a.balance.currentBalance) || 0), 0);
 
   // currentBalance is as of now, so walk this month's records backward to
   // recover the opening balance the runway starts from.
-  const monthNet = records
+  const monthNet = balanceRecords
     .filter((r) => !r.transfer && dayOf(r.recordDate) >= dayOf(start) && dayOf(r.recordDate) <= dayOf(todayISO))
     .reduce((sum, r) => sum + amountOf(r.convertedAmount ?? r.amount), 0);
   const opening = total - monthNet;
@@ -79,7 +95,9 @@ function build(rawData, todayISO) {
     generatedAt: new Date().toISOString(),
     today: todayISO,
     budgets: projected,
-    runway: runway(records, orders, opening, start, end, todayISO),
+    runway: runway(balanceRecords, orders, opening, start, end, todayISO),
+    currency: BASE_CURRENCY,
+    excludedAccounts,
     upcoming: upcoming(orders, todayISO, fmt(dayOf(todayISO) + 30 * DAY)),
     uncategorized: uncategorized.filter((r) => Number.isFinite(dayOf(r.recordDate))).map((r) => ({
       id: r.id,

@@ -12,9 +12,11 @@ const order = (over) => ({
   ...over,
 });
 
+// The shape snapshot.build() emits — flat, not the raw Wallet payload. decide()
+// only ever sees this, so the fixture has to be it.
 const budget = (over) => ({
   id: 'b1', name: 'per:total',
-  spending: { current: { spent: 50, effectiveLimit: 100, periodStart: '2026-09-01', periodEnd: '2026-09-30' } },
+  spent: 50, limit: 100, periodStart: '2026-09-01', periodEnd: '2026-09-30',
   ...over,
 });
 
@@ -55,14 +57,14 @@ test('the next month occurrence fires even though last month was notified', () =
 });
 
 test('a budget crossing eighty percent fires once', () => {
-  const b = budget({ spending: { current: { spent: 85, effectiveLimit: 100, periodStart: '2026-09-01', periodEnd: '2026-09-30' } } });
+  const b = budget({ spent: 85, limit: 100, periodStart: '2026-09-01', periodEnd: '2026-09-30' });
   const r = decide(snap({ budgets: [b] }), {}, '2026-09-18');
   assert.strictEqual(r.fire.length, 1);
   assert.strictEqual(r.fire[0].key, 'budget:b1:2026-09-01:80');
 });
 
 test('a budget over the limit fires both thresholds at once', () => {
-  const b = budget({ spending: { current: { spent: 120, effectiveLimit: 100, periodStart: '2026-09-01', periodEnd: '2026-09-30' } } });
+  const b = budget({ spent: 120, limit: 100, periodStart: '2026-09-01', periodEnd: '2026-09-30' });
   const r = decide(snap({ budgets: [b] }), {}, '2026-09-18');
   assert.deepStrictEqual(r.fire.map((x) => x.key).sort(),
     ['budget:b1:2026-09-01:100', 'budget:b1:2026-09-01:80']);
@@ -74,16 +76,16 @@ test('a budget under eighty percent fires nothing', () => {
 });
 
 test('a budget threshold re-arms in a new period', () => {
-  const b = budget({ spending: { current: { spent: 85, effectiveLimit: 100, periodStart: '2026-09-01', periodEnd: '2026-09-30' } } });
+  const b = budget({ spent: 85, limit: 100, periodStart: '2026-09-01', periodEnd: '2026-09-30' });
   const first = decide(snap({ budgets: [b] }), {}, '2026-09-18');
-  const b2 = budget({ spending: { current: { spent: 85, effectiveLimit: 100, periodStart: '2026-10-01', periodEnd: '2026-10-31' } } });
+  const b2 = budget({ spent: 85, limit: 100, periodStart: '2026-10-01', periodEnd: '2026-10-31' });
   const next = decide(snap({ budgets: [b2] }), first.notified, '2026-10-18');
   assert.strictEqual(next.fire.length, 1);
   assert.strictEqual(next.fire[0].key, 'budget:b1:2026-10-01:80');
 });
 
 test('a budget with a zero limit does not fire on a division by zero', () => {
-  const b = budget({ spending: { current: { spent: 5, effectiveLimit: 0, periodStart: '2026-09-01', periodEnd: '2026-09-30' } } });
+  const b = budget({ spent: 5, limit: 0, periodStart: '2026-09-01', periodEnd: '2026-09-30' });
   assert.deepStrictEqual(decide(snap({ budgets: [b] }), {}, '2026-09-18').fire, []);
 });
 
@@ -121,4 +123,22 @@ test('markers from old periods are pruned so state.json cannot grow forever', ()
   const stale = { 'order:old:2020-01-01:due': true, 'digest:2020-01-01': true };
   const r = decide(snap(), stale, '2026-09-18');
   assert.deepStrictEqual(r.notified, {});
+});
+
+// The contract these fixtures stand in for: decide() is only ever called with
+// build() output. When alerts read a field build() does not emit, every budget
+// notification goes silently missing and a fixture-shaped test cannot see it.
+test('a budget over its limit fires from a real snapshot, not just a fixture', () => {
+  const { build } = require('../main/snapshot');
+  const snapshot = build({
+    budgets: [{
+      id: 'b1',
+      name: 'Groceries',
+      spending: { current: { spent: 620, effectiveLimit: 500, periodStart: '2026-09-01', periodEnd: '2026-09-30' } },
+    }],
+    orders: [], accounts: [], records: [], uncategorized: [],
+  }, '2026-09-18');
+
+  const keys = decide(snapshot, {}, '2026-09-18').fire.map((f) => f.key);
+  assert.ok(keys.includes('budget:b1:2026-09-01:100'), keys.join(','));
 });
