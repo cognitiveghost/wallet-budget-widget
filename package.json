@@ -1,0 +1,17 @@
+{
+  "name": "wallet-budget-widget",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Desktop dashboard for BudgetBakers Wallet budgets, standing orders and projections",
+  "main": "main/index.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test",
+    "build": "electron-builder --win portable"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  }
+}
