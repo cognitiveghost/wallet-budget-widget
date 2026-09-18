@@ -47,12 +47,19 @@ function svgEl(tag, attrs, text) {
 // graduated scale and the headroom left over is what overshoot draws into.
 const LIMIT_STOP = 74;
 
+// Over by less than the smallest figure the panel can print is not over: the
+// row used to go red and then say "€0 over", which reads as a bug in the app
+// rather than a budget that landed exactly on its limit.
+const isOver = (b) => b.limit > 0 && b.overshoot >= 0.5;
+
 function renderBudgets(root, snapshot) {
   root.replaceChildren();
   if (!snapshot.budgets.length) {
     root.append(el('div', 'empty', 'No budgets in this Wallet account yet.'));
     return;
   }
+
+  const headPeriodEnd = snapshot.budgets[0].periodEnd;
 
   for (const b of snapshot.budgets) {
     const scale = b.limit > 0
@@ -63,12 +70,17 @@ function renderBudgets(root, snapshot) {
     const spentEnd = at(b.spent);
     const dueEnd = at(b.spent + b.scheduled);
     const projEnd = at(b.projected);
-    const over = b.limit > 0 && b.ratio >= 1;
+    const over = isOver(b);
 
     const row = el('div', 'brow');
 
     const top = el('div', 'btop');
     top.append(el('span', 'bname', b.name));
+    // The panel heading names one period, but budgets can run on their own.
+    // A week-long budget reading as a month makes a normal week look alarming.
+    if (b.periodEnd !== headPeriodEnd) {
+      top.append(el('span', 'bperiod', `to ${dayMonth(b.periodEnd)}`));
+    }
     const spent = el('span', 'bspent num');
     spent.append(el('em', null, money0(b.spent)), document.createTextNode(` of ${money0(b.limit)}`));
     top.append(spent);
@@ -274,7 +286,7 @@ function renderRunway(root, snapshot) {
 function renderVerdict(node, snapshot) {
   node.replaceChildren();
   const { actual, end } = snapshot.runway;
-  const over = snapshot.budgets.filter((b) => b.limit > 0 && b.ratio >= 1);
+  const over = snapshot.budgets.filter(isOver);
 
   // The end-of-month figure is already the largest thing on the screen. This
   // line earns its place by saying what the plot cannot: who is at fault, and
@@ -325,7 +337,10 @@ function renderNext(node, snapshot) {
   term('from', n.opening);
   if (n.income > 0) { node.append(el('span', 'op', '+')); term('planned in', n.income); }
   if (n.expense > 0) { node.append(el('span', 'op', '\u2212')); term('planned out', n.expense); }
-  if (n.burn > 0) { node.append(el('span', 'op', '\u2212')); term('at this rate', n.burn); }
+  if (Math.abs(n.rate) >= 1) {
+    node.append(el('span', 'op', n.rate < 0 ? '\u2212' : '+'));
+    term('at this rate', Math.abs(n.rate));
+  }
   node.append(el('span', 'op', '='));
   node.append(el('b', `close num${n.closing < 0 ? ' over' : ''}`, money0(n.closing)));
   node.append(el('span', 'term', `on ${dayMonth(n.end)}`));

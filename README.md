@@ -81,9 +81,20 @@ burn rate. Each row shows the three terms that produced its number.
 The balance line is the same arithmetic applied to money rather than to one
 budget's scope. It runs from the start of this month to the end of **next**
 month: measured up to today, then every standing order on its own date plus
-the everyday burn rate on every day. That last term is what makes the far end
-mean anything — a line that only books the payments it knows the date of
-drifts upward, and the longer the horizon the more it flatters you.
+the everyday rate on every day.
+
+That rate is **net and signed**, which is the difference between a forecast and
+an alarm. A balance moves on net flow, so money arriving off-schedule —
+a reimbursement, a shared cost coming back, any income nobody made a standing
+order for — counts exactly as much as money leaving. Extrapolating only the
+outgoings while counting nothing incoming but scheduled income walks every
+projection to zero whether or not the account is really draining.
+
+Which records are already on the calendar is a fact, not a guess:
+`/standing-orders/items` links each generated record to the order that produced
+it. The old amount-and-date heuristic is the fallback for manual payments the
+link does not cover. A miss there costs twice — the payment stays in the rate
+*and* is added again as a payment still to come.
 
 Two months in view moves where the news is. The end of the line stops being
 the worst point once payday lifts it again, so the low point in between is
@@ -107,4 +118,5 @@ irregular spending.
   as one it got right; only an unconfirmed record is visible.
 - **No server-side aggregation.** Rollups are computed locally from `/records`.
 - **Rate limit.** 300 requests/hour sustained. The default 5-minute poll uses
-  roughly 72/hour and backs off automatically when the remaining budget is low.
+  six requests per cycle before paging — roughly 72/hour — and backs off
+  automatically when the remaining budget is low.

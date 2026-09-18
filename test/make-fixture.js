@@ -77,6 +77,29 @@ for (let d = -74; d <= 0; d += 1) {
   }
 }
 
+// Salary lands as a record too, linked back to the order that generated it so
+// it is not counted twice. Plus the shared-cost half that comes back a few
+// days later, which nothing schedules — the term that used to be invisible.
+const orderItems = [];
+for (const back of [-54, -24]) {
+  const id = `r-pay${back}`;
+  records.push({
+    id, accountId: 'a1', recordDate: iso(back),
+    convertedAmount: { currencyCode: 'EUR', value: 2480 }, amount: { currencyCode: 'EUR', value: 2480 },
+    category: { id: 'c-inc' }, categoryId: 'c-inc', labels: [],
+    counterParty: 'Payroll', accountName: 'Revolut', recordState: 'cleared', transfer: null,
+  });
+  orderItems.push({ standingOrderId: 'o1', recordIds: [id] });
+}
+for (const [back, value] of [[-46, 210], [-31, 185], [-12, 240]]) {
+  records.push({
+    id: `r-share${back}`, accountId: 'a1', recordDate: iso(back),
+    convertedAmount: { currencyCode: 'EUR', value }, amount: { currencyCode: 'EUR', value },
+    category: { id: 'c-inc' }, categoryId: 'c-inc', labels: [],
+    counterParty: 'Shared costs back', accountName: 'Revolut', recordState: 'cleared', transfer: null,
+  });
+}
+
 // A couple of records the rules never assigned, so the panel shows both states.
 records.push({
   id: 'r-wa1', accountId: 'a1', recordDate: iso(-2),
@@ -108,13 +131,24 @@ const budgets = [
   budget('b4', 'Fun', CAT.fun, 90),
   budget('b5', 'Subscriptions', CAT.subs, 90),
   budget('b6', 'Home', CAT.home, 1300),
+  // A week-long budget alongside the monthly ones, so the row that runs on its
+  // own period is drawn with its own period.
+  {
+    id: 'b7', name: 'Food this week', accountIds: [], categoryIds: [CAT.groceries], labelIds: [],
+    type: 'BUDGET_INTERVAL_WEEK', limit: 150,
+    spending: { current: {
+      period: '2026-W38', periodStart: '2026-09-14', periodEnd: '2026-09-20',
+      spent: Math.round(spent(CAT.groceries, '2026-09-14') * 100) / 100,
+      effectiveLimit: 150, progress: 0.62,
+    } },
+  },
 ];
 
 const uncategorized = records
   .filter((r) => r.category.id.startsWith('5c5c32'))
   .map((r) => ({ ...r }));
 
-const snapshot = build({ budgets, orders, accounts, records, uncategorized }, TODAY);
+const snapshot = build({ budgets, orders, accounts, records, uncategorized, orderItems }, TODAY);
 snapshot.generatedAt = '2026-09-18T14:32:00Z';
 
 const out = path.join(__dirname, 'fixture-snapshot.js');
@@ -125,6 +159,6 @@ if (typeof window !== "undefined") window.FIXTURE = FIXTURE;
 if (typeof module !== "undefined") module.exports = FIXTURE;
 `);
 console.log(`${out}: ${snapshot.budgets.length} budgets, ${snapshot.unchecked.length} unchecked, ` +
-  `runway ${snapshot.runway.actual[0].date} → ${snapshot.runway.projected[snapshot.runway.projected.length - 1].date}`);
+  `rate/day ${snapshot.ratePerDay}, runway ${snapshot.runway.actual[0].date} → ${snapshot.runway.projected[snapshot.runway.projected.length - 1].date}`);
 console.log(`today ${day(0)} balance ${snapshot.runway.actual[snapshot.runway.actual.length - 1].balance}, ` +
-  `month end ${snapshot.runway.monthEnd}, next close ${snapshot.nextMonth.closing}, burn/day ${snapshot.burnPerDay}`);
+  `month end ${snapshot.runway.monthEnd}, next close ${snapshot.nextMonth.closing}`);

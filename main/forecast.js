@@ -55,13 +55,22 @@ function inScope(budget, item) {
   return true;
 }
 
-// Attribute a record to a standing order so it can be excluded from the
-// discretionary rate. /standing-orders/items links generated records to their
-// parent, but manualPayment orders produce hand-entered records with no such
-// link, so this heuristic covers both.
-// ponytail: amount+account+-3d window. Tighten with standing-order-items if
-// false positives ever show up in practice.
-function isRecurring(record, orders) {
+// The ids /standing-orders/items reports as having produced a record. This is
+// the fact; the heuristic below is the fallback for what it does not cover.
+function linkedRecordIds(items) {
+  const ids = new Set();
+  for (const it of items || []) for (const id of it.recordIds || []) ids.add(id);
+  return ids;
+}
+
+// Attribute a record to a standing order so it can be excluded from the rate.
+// A miss here costs twice: the payment stays in the rate AND is added again as
+// a payment still to come, so the projection loses the same money two ways.
+// manualPayment orders produce hand-entered records that /standing-orders/items
+// never links, so the heuristic still has to cover them.
+// ponytail: amount+account+-3d window. It is the fallback now, not the rule.
+function isRecurring(record, orders, linked) {
+  if (linked && linked.has(record.id)) return true;
   const amount = Math.abs(signedOf(record));
   const when = dayOf(record.recordDate);
   if (!Number.isFinite(when)) return false;
@@ -80,21 +89,39 @@ function isRecurring(record, orders) {
 }
 
 // Mean daily spend of everything that is neither a transfer, nor income, nor
-// attributable to a standing order. Always a non-negative magnitude.
-function discretionaryRate(records, orders, days) {
+// attributable to a standing order. Always a non-negative magnitude. Budgets
+// count expenses only — Wallet excludes income categories from a budget's
+// spending — so this stays gross.
+function discretionaryRate(records, orders, days, linked) {
   if (!days || days <= 0) return 0;
   let total = 0;
   for (const r of records || []) {
     if (r.transfer) continue;
     const v = signedOf(r);
     if (v >= 0) continue; // income and zero-value records
-    if (isRecurring(r, orders)) continue;
+    if (isRecurring(r, orders, linked)) continue;
     total += -v;
   }
   return total / days;
 }
 
-function projectBudget(budget, orders, records, todayISO) {
+// Mean daily change in balance from everything not already on the calendar:
+// signed, so money that arrives counts as much as money that leaves. A balance
+// moves on net flow, and extrapolating only the outgoings while counting
+// nothing but scheduled income marches every projection to zero regardless of
+// whether the account is actually draining.
+function netRate(records, orders, days, linked) {
+  if (!days || days <= 0) return 0;
+  let total = 0;
+  for (const r of records || []) {
+    if (r.transfer) continue;
+    if (isRecurring(r, orders, linked)) continue;
+    total += signedOf(r);
+  }
+  return total / days;
+}
+
+function projectBudget(budget, orders, records, todayISO, linked) {
   const cur = (budget.spending && budget.spending.current) || null;
   const spent = cur ? Number(cur.spent) || 0 : 0;
   const limit = cur && cur.effectiveLimit != null
@@ -128,7 +155,7 @@ function projectBudget(budget, orders, records, todayISO) {
   const scopedRecords = (records || [])
     .filter((r) => inScope(budget, r))
     .filter((r) => dayOf(r.recordDate) >= dayOf(start) && dayOf(r.recordDate) <= dayOf(today));
-  const rate = discretionaryRate(scopedRecords, orders, elapsed);
+  const rate = discretionaryRate(scopedRecords, orders, elapsed, linked);
   const discretionary = rate * remaining;
 
   const projected = spent + scheduled + discretionary;
@@ -168,11 +195,12 @@ function projectBudget(budget, orders, records, todayISO) {
 // Daily balance series: measured up to today, arithmetic from today to the
 // horizon. startBalance is the balance as of periodStartISO.
 //
-// burnPerDay is everyday spending — what is left after transfers, income and
-// standing orders are taken out. Without it the projection only ever books the
-// money it knows the date of, so the line drifts up and the further the
-// horizon runs the more it lies.
-function runway(records, orders, startBalance, periodStartISO, periodEndISO, todayISO, burnPerDay = 0) {
+// ratePerDay is the everyday net flow — what moves the balance that is not a
+// transfer and not already on the calendar. Signed: negative is the usual
+// case, positive is an account that takes in more off-schedule than it spends.
+// Without it the projection only books money it knows the date of, so the line
+// drifts and the further the horizon runs the more it lies.
+function runway(records, orders, startBalance, periodStartISO, periodEndISO, todayISO, ratePerDay = 0) {
   const start = dayOf(periodStartISO);
   const end = dayOf(periodEndISO);
   const today = Math.min(dayOf(todayISO), end);
@@ -201,16 +229,16 @@ function runway(records, orders, startBalance, periodStartISO, periodEndISO, tod
     events.set(e.date, (events.get(e.date) || 0) + e.signed);
   }
 
-  const burn = Math.max(0, Number(burnPerDay) || 0);
+  const rate = Number(ratePerDay) || 0;
   const projected = [{ date: fmt(today), balance: actual.length ? actual[actual.length - 1].balance : balance }];
   let p = projected[0].balance;
   for (let ms = today + DAY; ms <= end; ms += DAY) {
     const d = fmt(ms);
-    p += (events.get(d) || 0) - burn;
+    p += (events.get(d) || 0) + rate;
     projected.push({ date: d, balance: Math.round(p * 100) / 100 });
   }
 
   return { actual, projected, end: projected[projected.length - 1].balance };
 }
 
-module.exports = { inScope, isRecurring, discretionaryRate, projectBudget, runway, amountOf };
+module.exports = { inScope, isRecurring, linkedRecordIds, discretionaryRate, netRate, projectBudget, runway, amountOf };

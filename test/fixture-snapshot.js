@@ -68,6 +68,22 @@ const FIXTURE = {
       "crossesOn": "2026-09-21"
     },
     {
+      "id": "b7",
+      "name": "Food this week",
+      "period": "2026-W38",
+      "periodStart": "2026-09-14",
+      "periodEnd": "2026-09-20",
+      "progress": 0.62,
+      "spent": 50.21,
+      "scheduled": 0,
+      "discretionary": 20.084,
+      "projected": 70.294,
+      "limit": 150,
+      "ratio": 0.46862666666666664,
+      "overshoot": 0,
+      "crossesOn": null
+    },
+    {
       "id": "b5",
       "name": "Subscriptions",
       "period": "MONTH",
@@ -104,23 +120,23 @@ const FIXTURE = {
     "actual": [
       {
         "date": "2026-09-01",
-        "balance": 3117.06
+        "balance": 2877.06
       },
       {
         "date": "2026-09-02",
-        "balance": 3109.81
+        "balance": 2869.81
       },
       {
         "date": "2026-09-03",
-        "balance": 3069.7
+        "balance": 2829.7
       },
       {
         "date": "2026-09-04",
-        "balance": 3052.34
+        "balance": 2812.34
       },
       {
         "date": "2026-09-05",
-        "balance": 2991.57
+        "balance": 2751.57
       },
       {
         "date": "2026-09-06",
@@ -182,190 +198,190 @@ const FIXTURE = {
       },
       {
         "date": "2026-09-19",
-        "balance": 2226.6
+        "balance": 2237.18
       },
       {
         "date": "2026-09-20",
-        "balance": 2172.6
+        "balance": 2193.76
       },
       {
         "date": "2026-09-21",
-        "balance": 2118.6
+        "balance": 2150.34
       },
       {
         "date": "2026-09-22",
-        "balance": 2052.6
+        "balance": 2094.94
       },
       {
         "date": "2026-09-23",
-        "balance": 1998.6
+        "balance": 2051.52
       },
       {
         "date": "2026-09-24",
-        "balance": 1944.6
+        "balance": 2008.1
       },
       {
         "date": "2026-09-25",
-        "balance": 4370.6
+        "balance": 4444.68
       },
       {
         "date": "2026-09-26",
-        "balance": 4316.6
+        "balance": 4401.26
       },
       {
         "date": "2026-09-27",
-        "balance": 4262.59
+        "balance": 4357.84
       },
       {
         "date": "2026-09-28",
-        "balance": 4146.59
+        "balance": 4252.43
       },
       {
         "date": "2026-09-29",
-        "balance": 4092.59
+        "balance": 4209.01
       },
       {
         "date": "2026-09-30",
-        "balance": 4038.59
+        "balance": 4165.59
       },
       {
         "date": "2026-10-01",
-        "balance": 2834.59
+        "balance": 2972.17
       },
       {
         "date": "2026-10-02",
-        "balance": 2780.59
+        "balance": 2928.75
       },
       {
         "date": "2026-10-03",
-        "balance": 2726.58
+        "balance": 2885.34
       },
       {
         "date": "2026-10-04",
-        "balance": 2672.58
+        "balance": 2841.92
       },
       {
         "date": "2026-10-05",
-        "balance": 2579.58
+        "balance": 2759.5
       },
       {
         "date": "2026-10-06",
-        "balance": 2525.58
+        "balance": 2716.08
       },
       {
         "date": "2026-10-07",
-        "balance": 2471.58
+        "balance": 2672.66
       },
       {
         "date": "2026-10-08",
-        "balance": 2417.58
+        "balance": 2629.24
       },
       {
         "date": "2026-10-09",
-        "balance": 2363.57
+        "balance": 2585.82
       },
       {
         "date": "2026-10-10",
-        "balance": 2309.57
+        "balance": 2542.41
       },
       {
         "date": "2026-10-11",
-        "balance": 2255.57
+        "balance": 2498.99
       },
       {
         "date": "2026-10-12",
-        "balance": 2201.57
+        "balance": 2455.57
       },
       {
         "date": "2026-10-13",
-        "balance": 2147.57
+        "balance": 2412.15
       },
       {
         "date": "2026-10-14",
-        "balance": 2069.07
+        "balance": 2344.23
       },
       {
         "date": "2026-10-15",
-        "balance": 2015.07
+        "balance": 2300.81
       },
       {
         "date": "2026-10-16",
-        "balance": 1961.06
+        "balance": 2257.4
       },
       {
         "date": "2026-10-17",
-        "balance": 1907.06
+        "balance": 2213.98
       },
       {
         "date": "2026-10-18",
-        "balance": 1853.06
+        "balance": 2170.56
       },
       {
         "date": "2026-10-19",
-        "balance": 1799.06
+        "balance": 2127.14
       },
       {
         "date": "2026-10-20",
-        "balance": 1745.06
+        "balance": 2083.72
       },
       {
         "date": "2026-10-21",
-        "balance": 1691.05
+        "balance": 2040.3
       },
       {
         "date": "2026-10-22",
-        "balance": 1625.06
+        "balance": 1984.9
       },
       {
         "date": "2026-10-23",
-        "balance": 1571.06
+        "balance": 1941.48
       },
       {
         "date": "2026-10-24",
-        "balance": 1517.06
+        "balance": 1898.06
       },
       {
         "date": "2026-10-25",
-        "balance": 3943.06
+        "balance": 4334.64
       },
       {
         "date": "2026-10-26",
-        "balance": 3889.06
+        "balance": 4291.22
       },
       {
         "date": "2026-10-27",
-        "balance": 3835.05
+        "balance": 4247.8
       },
       {
         "date": "2026-10-28",
-        "balance": 3719.05
+        "balance": 4142.39
       },
       {
         "date": "2026-10-29",
-        "balance": 3665.05
+        "balance": 4098.97
       },
       {
         "date": "2026-10-30",
-        "balance": 3611.05
+        "balance": 4055.55
       },
       {
         "date": "2026-10-31",
-        "balance": 3557.05
+        "balance": 4012.13
       }
     ],
-    "end": 3557.05,
-    "monthEnd": 4038.59,
+    "end": 4012.13,
+    "monthEnd": 4165.59,
     "monthEndDate": "2026-09-30"
   },
-  "burnPerDay": 54,
+  "ratePerDay": -43.42,
   "nextMonth": {
     "start": "2026-10-01",
     "end": "2026-10-31",
-    "opening": 4038.59,
+    "opening": 4165.59,
     "income": 2480,
     "expense": 1287.49,
-    "burn": 1674.05,
-    "closing": 3557.05
+    "rate": -1345.97,
+    "closing": 4012.13
   },
   "currency": "EUR",
   "excludedAccounts": [

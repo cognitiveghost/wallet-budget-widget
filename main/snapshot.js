@@ -1,5 +1,5 @@
 const { upcoming } = require('./rrule');
-const { projectBudget, runway, amountOf, discretionaryRate } = require('./forecast');
+const { projectBudget, runway, amountOf, netRate, linkedRecordIds } = require('./forecast');
 
 const DAY = 86400000;
 const STALE_DAYS = 4;
@@ -33,11 +33,12 @@ function monthBounds(todayISO, offset = 0) {
 }
 
 function build(rawData, todayISO) {
-  const { budgets = [], orders = [], accounts = [], records = [], uncategorized = [] } = rawData;
+  const { budgets = [], orders = [], accounts = [], records = [], uncategorized = [], orderItems = [] } = rawData;
+  const linked = linkedRecordIds(orderItems);
   const { start, end } = monthBounds(todayISO);
 
   const projected = budgets.map((b) => {
-    const p = projectBudget(b, orders, records, todayISO);
+    const p = projectBudget(b, orders, records, todayISO, linked);
     const cur = (b.spending && b.spending.current) || {};
     return {
       id: b.id,
@@ -68,15 +69,17 @@ function build(rawData, todayISO) {
   const includedIds = new Set(included.map((a) => a.id));
   const balanceRecords = records.filter((r) => includedIds.has(r.accountId));
 
-  // Everyday spending: what is left once transfers, income and standing orders
-  // are taken out, averaged over a window long enough that one big Saturday
-  // does not become the forecast. It is the only term that carries the
-  // projection past the dates we already know.
+  // Everyday net flow: everything that moves the balance and is not already on
+  // the calendar, averaged over a window long enough that one big Saturday
+  // does not become the forecast. Signed on purpose — counting only what goes
+  // out, while counting nothing coming in but scheduled income, walks every
+  // projection to zero whether or not the account is really draining.
   const rateFrom = dayOf(todayISO) - RATE_DAYS * DAY;
-  const burn = discretionaryRate(
+  const rate = netRate(
     balanceRecords.filter((r) => dayOf(r.recordDate) >= rateFrom && dayOf(r.recordDate) <= dayOf(todayISO)),
     orders,
     RATE_DAYS,
+    linked,
   );
 
   const total = included.reduce((sum, a) => sum + (Number(a.balance && a.balance.currentBalance) || 0), 0);
@@ -109,7 +112,7 @@ function build(rawData, todayISO) {
   // The line runs to the end of next month: this month's closing balance is
   // only half an answer when rent and payday both land on the far side of it.
   const next = monthBounds(todayISO, 1);
-  const line = runway(balanceRecords, orders, opening, start, next.end, todayISO, burn);
+  const line = runway(balanceRecords, orders, opening, start, next.end, todayISO, rate);
   const balanceOn = (d) => {
     const hit = line.projected.find((x) => x.date === d) || line.actual.find((x) => x.date === d);
     return hit ? hit.balance : null;
@@ -123,14 +126,14 @@ function build(rawData, todayISO) {
     today: todayISO,
     budgets: projected,
     runway: { ...line, monthEnd: balanceOn(end), monthEndDate: end },
-    burnPerDay: Math.round(burn * 100) / 100,
+    ratePerDay: Math.round(rate * 100) / 100,
     nextMonth: {
       start: next.start,
       end: next.end,
       opening: balanceOn(end),
       income: nextEvents.filter((e) => e.signed > 0).reduce((sum, e) => sum + e.signed, 0),
       expense: nextEvents.filter((e) => e.signed < 0).reduce((sum, e) => sum - e.signed, 0),
-      burn: Math.round(burn * nextDays * 100) / 100,
+      rate: Math.round(rate * nextDays * 100) / 100,
       closing: line.end,
     },
     currency: BASE_CURRENCY,

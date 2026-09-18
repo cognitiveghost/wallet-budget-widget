@@ -223,8 +223,8 @@ test('next month closes on its opening plus what is planned, minus the rate', ()
   const n = s.nextMonth;
   assert.strictEqual(n.income, 2000);
   assert.strictEqual(n.expense, 800);
-  assert.ok(Math.abs((n.opening + n.income - n.expense - n.burn) - n.closing) < 0.02,
-    `${n.opening} + ${n.income} - ${n.expense} - ${n.burn} should reach ${n.closing}`);
+  assert.ok(Math.abs((n.opening + n.income - n.expense + n.rate) - n.closing) < 0.02,
+    `${n.opening} + ${n.income} - ${n.expense} + ${n.rate} should reach ${n.closing}`);
 });
 
 test('everyday spending reaches the line, so the far end is not just orders', () => {
@@ -233,7 +233,7 @@ test('everyday spending reaches the line, so the far end is not just orders', ()
     recordDate: `2026-08-${String(i + 1).padStart(2, '0')}T12:00:00Z`,
   }));
   const s = build(raw({ accounts: [eurAccount()], records }), '2026-09-18');
-  assert.ok(s.burnPerDay > 0, 'a month of spending has a rate');
+  assert.ok(s.ratePerDay < 0, 'a month of nothing but spending has a negative rate');
   assert.ok(s.nextMonth.closing < s.nextMonth.opening,
     'with no income planned, next month can only go down');
 });
@@ -258,4 +258,38 @@ test('an account that never reports review state is told apart from a clean one'
   const s = build(raw({ accounts: [eurAccount()], records }), '2026-09-18');
   assert.deepStrictEqual(s.unchecked, []);
   assert.strictEqual(s.reviewStateSeen, false, 'the UI needs to say why the list is empty');
+});
+
+test('off-schedule income keeps the line from marching to zero', () => {
+  // Spends 40 a day and is paid 40 a day by transfers nobody scheduled. The
+  // balance is flat in reality, and the projection has to say so.
+  const records = [];
+  for (let d = 1; d <= 28; d += 1) {
+    const day = `2026-08-${String(d).padStart(2, '0')}T12:00:00Z`;
+    records.push({ id: `out${d}`, accountId: 'a1', recordDate: day, convertedAmount: -40 });
+    records.push({ id: `in${d}`, accountId: 'a1', recordDate: day, convertedAmount: 40 });
+  }
+  const s = build(raw({ accounts: [eurAccount()], records }), '2026-09-18');
+  assert.strictEqual(s.ratePerDay, 0);
+  assert.strictEqual(s.nextMonth.closing, s.nextMonth.opening,
+    'nothing scheduled and no drift means the balance stays put');
+});
+
+test('a standing order the link claims is left out of the rate', () => {
+  const orders = [{
+    id: 'o1', name: 'Bill', amount: 60, type: 'expense', accountId: 'a1', categoryId: 'c1',
+    generateFromDate: '2026-01-10', recurrenceRule: 'FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=10',
+  }];
+  // Billed 88, not the 60 the order says, so only the link can attribute it.
+  const records = [{ id: 'bill-88', accountId: 'a1', recordDate: '2026-09-10T12:00:00Z', convertedAmount: -88 }];
+  const loose = build(raw({ accounts: [eurAccount()], orders, records }), '2026-09-18');
+  const tied = build(raw({
+    accounts: [eurAccount()], orders, records,
+    orderItems: [{ standingOrderId: 'o1', recordIds: ['bill-88'] }],
+  }), '2026-09-18');
+
+  assert.ok(loose.ratePerDay < 0, 'unlinked, the bill is everyday spending as well as a payment due');
+  assert.strictEqual(tied.ratePerDay, 0);
+  assert.ok(tied.nextMonth.closing > loose.nextMonth.closing,
+    'counting it once instead of twice leaves more money at the end');
 });

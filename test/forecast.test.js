@@ -250,24 +250,26 @@ test('signed amount reads the {value} object the API returns', () => {
 
 test('everyday spending pulls the projection down by the rate per day', () => {
   const flat = f.runway([], [], 1000, '2026-09-01', '2026-09-30', '2026-09-10');
-  const burnt = f.runway([], [], 1000, '2026-09-01', '2026-09-30', '2026-09-10', 10);
-  assert.strictEqual(flat.end, 1000, 'no orders and no burn means a flat line');
+  const burnt = f.runway([], [], 1000, '2026-09-01', '2026-09-30', '2026-09-10', -10);
+  assert.strictEqual(flat.end, 1000, 'no orders and no rate means a flat line');
   // 20 days from the 10th to the 30th, at 10 a day.
   assert.strictEqual(burnt.end, 800);
 });
 
-test('a burn rate never turns a projection upward', () => {
-  const r = f.runway([], [], 500, '2026-09-01', '2026-09-30', '2026-09-10', -25);
-  assert.strictEqual(r.end, 500, 'a negative rate is refused, not added as income');
+// An account that takes in more off-schedule than it spends really does climb.
+// Refusing to draw that was what made every projection end at zero.
+test('a positive rate lifts the projection', () => {
+  const r = f.runway([], [], 500, '2026-09-01', '2026-09-30', '2026-09-10', 25);
+  assert.strictEqual(r.end, 1000); // 500 + 20 days x 25
 });
 
-test('the projection subtracts the rate alongside standing orders', () => {
+test('the projection applies the rate alongside standing orders', () => {
   const orders = [{
     id: 'o1', name: 'Rent', amount: 100, type: 'expense', accountId: 'a1',
     generateFromDate: '2026-09-01', recurrenceRule: 'FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=20',
   }];
-  const r = f.runway([], orders, 1000, '2026-09-01', '2026-09-30', '2026-09-10', 10);
-  assert.strictEqual(r.end, 700); // 1000 - 100 rent - 200 burn
+  const r = f.runway([], orders, 1000, '2026-09-01', '2026-09-30', '2026-09-10', -10);
+  assert.strictEqual(r.end, 700); // 1000 - 100 rent - 200 everyday
 });
 
 // --- the day a budget goes over -------------------------------------------
@@ -304,4 +306,54 @@ test('a budget already past its limit names no day, because the day has gone', (
   const p = f.projectBudget(b, [], [], '2026-09-09');
   assert.strictEqual(p.crossesOn, null);
   assert.ok(p.spent > p.limit, 'the UI reads this pair instead');
+});
+
+// --- the rate is net, and recurrence is a fact ----------------------------
+// Two bugs found against live data. Extrapolating only the outgoings while
+// counting nothing incoming but scheduled income walked the balance to zero
+// on an account that was actually break-even; and every standing order the
+// amount-and-date heuristic missed was counted twice, once in the rate and
+// again as a payment still to come.
+
+const on = (d, over) => ({ id: `r-${d}`, accountId: 'a1', recordDate: `2026-09-${d}T12:00:00Z`, ...over });
+
+test('the net rate counts money arriving, not only money leaving', () => {
+  const records = [on('01', { convertedAmount: -300 }), on('02', { convertedAmount: 300 })];
+  assert.strictEqual(f.netRate(records, [], 10), 0, 'a month that breaks even has no drift');
+  assert.strictEqual(f.discretionaryRate(records, [], 10), 30, 'budgets still see gross spend');
+});
+
+test('an account taking in more than it spends has a positive rate', () => {
+  const records = [on('01', { convertedAmount: -100 }), on('02', { convertedAmount: 400 })];
+  assert.strictEqual(f.netRate(records, [], 10), 30);
+});
+
+test('a linked record is recurring however far its amount has drifted', () => {
+  const order = {
+    id: 'o1', name: 'Electricity', amount: 60, type: 'expense', accountId: 'a1',
+    generateFromDate: '2026-01-10', recurrenceRule: 'FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=10',
+  };
+  // A variable bill: 88 is nowhere near the order's 60, so the heuristic misses
+  // it and the payment would be counted in the rate as well as on the calendar.
+  const bill = { id: 'rec-88', accountId: 'a1', recordDate: '2026-09-10T12:00:00Z', convertedAmount: -88 };
+  assert.strictEqual(f.isRecurring(bill, [order]), false, 'the heuristic alone cannot see it');
+
+  const linked = f.linkedRecordIds([{ standingOrderId: 'o1', recordIds: ['rec-88'] }]);
+  assert.strictEqual(f.isRecurring(bill, [order], linked), true);
+  assert.strictEqual(f.netRate([bill], [order], 10, linked), 0, 'and so it leaves the rate');
+});
+
+test('the heuristic still covers records the link does not', () => {
+  const order = {
+    id: 'o1', name: 'Rent', amount: 500, type: 'expense', accountId: 'a1',
+    generateFromDate: '2026-01-01', recurrenceRule: 'FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=1',
+  };
+  const paid = { id: 'manual', accountId: 'a1', recordDate: '2026-09-01T12:00:00Z', convertedAmount: -500 };
+  assert.strictEqual(f.isRecurring(paid, [order], f.linkedRecordIds([])), true);
+});
+
+test('linkedRecordIds survives items with no records attached yet', () => {
+  const ids = f.linkedRecordIds([{ standingOrderId: 'o1' }, { standingOrderId: 'o2', recordIds: ['r1'] }]);
+  assert.strictEqual(ids.has('r1'), true);
+  assert.strictEqual(ids.size, 1);
 });
