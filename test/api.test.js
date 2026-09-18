@@ -140,3 +140,33 @@ test('paged stops instead of looping forever when offset is ignored', async () =
   assert.equal(calls, 100);
   assert.equal(out.length, 20000);
 });
+
+test('a stalled request reports a timeout instead of hanging', async () => {
+  // The real deadline is 30s; assert the mapping, not the wall clock.
+  const api = createApi({
+    token: 't',
+    fetchImpl: async () => { throw Object.assign(new Error('aborted'), { name: 'TimeoutError' }); },
+  });
+  await assert.rejects(() => api.accounts(), /did not respond within 30s/);
+});
+
+test('a non-timeout network error passes through unchanged', async () => {
+  const api = createApi({
+    token: 't',
+    fetchImpl: async () => { throw new TypeError('fetch failed'); },
+  });
+  await assert.rejects(() => api.accounts(), /fetch failed/);
+});
+
+test('the request carries an abort signal', async () => {
+  let seen = null;
+  const api = createApi({
+    token: 't',
+    fetchImpl: async (_u, opts) => {
+      seen = opts.signal;
+      return { ok: true, status: 200, headers: { get: () => null }, json: async () => ({ accounts: [] }) };
+    },
+  });
+  await api.accounts();
+  assert.ok(seen && typeof seen.addEventListener === 'function');
+});

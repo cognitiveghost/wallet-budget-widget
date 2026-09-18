@@ -1,8 +1,13 @@
 const path = require('node:path');
-const { app, BrowserWindow, ipcMain, shell, safeStorage } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, safeStorage, net } = require('electron');
 const store = require('./store');
 const secrets = require('./secrets');
 const { createApi } = require('./api');
+
+// Chromium's stack, not Node's undici: on Windows this is what honours the
+// system proxy and the OS certificate store, so TLS-inspecting antivirus and
+// corporate proxies work instead of hanging the request.
+const walletApi = (token) => createApi({ token, fetchImpl: (u, o) => net.fetch(u, o) });
 const poll = require('./poll');
 const notify = require('./notify');
 const { decide } = require('./alerts');
@@ -57,7 +62,7 @@ function startPolling() {
     return;
   }
   send('status', { state: 'loading' });
-  poll.start({ api: createApi({ token }), onSnapshot, onError });
+  poll.start({ api: walletApi(token), onSnapshot, onError });
 }
 
 function createWindow() {
@@ -108,7 +113,7 @@ ipcMain.handle('token:clear', async () => {
 ipcMain.handle('refresh', async () => {
   const token = secrets.load();
   if (!token) return;
-  await poll.refreshNow({ api: createApi({ token }), onSnapshot, onError });
+  await poll.refreshNow({ api: walletApi(token), onSnapshot, onError });
 });
 
 ipcMain.handle('open-external', async (_e, url) => {

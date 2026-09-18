@@ -1,5 +1,8 @@
 const BASE = 'https://rest.budgetbakers.com/wallet/v1/api';
 const PAGE = 200; // the documented maximum for limit
+// Without a deadline a stalled connection (proxy blackhole, TLS interception)
+// leaves the UI on "Connecting…" forever instead of reporting a failure.
+const TIMEOUT_MS = 30000;
 
 // Responses wrap their list under a type-specific key (budgets, accounts,
 // records, standingOrders). Take that key by name: `agentHints` is also an
@@ -29,9 +32,18 @@ function createApi({ token, fetchImpl }) {
       else url.searchParams.append(k, v);
     }
 
-    const res = await doFetch(url.toString(), {
-      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-    });
+    let res;
+    try {
+      res = await doFetch(url.toString(), {
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+    } catch (err) {
+      if (err && (err.name === 'TimeoutError' || err.name === 'AbortError')) {
+        throw new Error(`Wallet did not respond within ${TIMEOUT_MS / 1000}s`);
+      }
+      throw err;
+    }
 
     const hdr = (n) => (res.headers && typeof res.headers.get === 'function' ? res.headers.get(n) : null);
     const rem = hdr('x-ratelimit-remaining-hour');
