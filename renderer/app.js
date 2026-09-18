@@ -131,6 +131,64 @@ function renderRunway(root, snapshot) {
   root.append(foot);
 }
 
+// ------------------------------------------------- upcoming / inbox / sync
+
+const dm = (iso) => `${iso.slice(8)}.${iso.slice(5, 7)}`;
+
+function renderUpcoming(root, snapshot) {
+  root.replaceChildren();
+  if (!snapshot.upcoming.length) {
+    root.append(el('div', 'empty', 'Nothing scheduled in the next 30 days.'));
+    return;
+  }
+  for (const e of snapshot.upcoming) {
+    const row = el('div', 'row');
+    row.append(el('span', 'd', dm(e.date)));
+    row.append(el('span', 'n', e.name));
+    row.append(el('span', `a ${e.signed >= 0 ? 'pos' : 'neg'}`, eur(e.signed)));
+    root.append(row);
+  }
+}
+
+function renderInbox(root, countEl, syncEl, snapshot) {
+  root.replaceChildren();
+  syncEl.replaceChildren();
+
+  countEl.textContent = snapshot.uncategorized.length ? `(${snapshot.uncategorized.length})` : '';
+
+  if (!snapshot.uncategorized.length) {
+    root.append(el('div', 'empty', 'Everything is categorized.'));
+  } else {
+    for (const r of snapshot.uncategorized) {
+      const row = el('div', 'row clickable');
+      row.append(el('span', 'd', dm(r.date)));
+      row.append(el('span', 'n', r.counterParty || r.accountName || 'record'));
+      row.append(el('span', `a ${r.amount >= 0 ? 'pos' : 'neg'}`, eur(r.amount)));
+      // Read-only by design: fixing a category happens in Wallet web.
+      row.title = 'Open Wallet web to categorize';
+      row.addEventListener('click', () => window.api.openExternal('https://web.budgetbakers.com/records'));
+      root.append(row);
+    }
+  }
+
+  if (!snapshot.sync.length) return;
+
+  for (const s of snapshot.sync) {
+    const row = el('div', 'sync-row');
+    row.append(el('span', 'n', s.name));
+    if (s.error) {
+      row.append(el('span', 'bad', s.error));
+    } else if (s.stale) {
+      row.append(el('span', 'stale', `no bank record for ${s.ageDays}d`));
+    } else if (s.ageDays === null) {
+      row.append(el('span', 'stale', 'no records yet'));
+    } else {
+      row.append(el('span', 'ok', s.ageDays === 0 ? 'synced today' : `${s.ageDays}d ago`));
+    }
+    syncEl.append(row);
+  }
+}
+
 // --------------------------------------------------------------- shell
 
 let lastSnapshot = null;
