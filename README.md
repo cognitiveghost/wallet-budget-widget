@@ -25,8 +25,11 @@ npm start
 ## Build a portable exe
 
 ```bash
-npm run build      # -> dist/WalletBudgetWidget-0.1.0.exe
+npm run build      # -> dist/WalletBudgetWidget-<version>.exe
 ```
+
+Release builds take their version from the pushed tag, not from
+`package.json` — push `v0.5.0` and the exe is `WalletBudgetWidget-0.5.0.exe`.
 
 ## Tests
 

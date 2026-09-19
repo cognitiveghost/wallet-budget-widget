@@ -18,8 +18,25 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # electron-builder names the exe from package.json's `version`, but the
+      # tag is what actually cuts a release and nobody remembers to bump both.
+      # Every artifact since v0.1.0 therefore carried whatever version the file
+      # happened to hold. The tag wins; package.json is only the dev default.
+      - name: Take the version from the tag
+        if: startsWith(github.ref, 'refs/tags/')
+        run: npm version $env:GITHUB_REF_NAME --no-git-tag-version --allow-same-version
       - run: npm test
       - run: npm run build
+      # The rename above is silent when it fails, and the failure looks exactly
+      # like a successful release until somebody downloads it.
+      - name: The artifact must carry the tag's version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          $v = $env:GITHUB_REF_NAME -replace '^v', ''
+          $want = "dist/WalletBudgetWidget-$v.exe"
+          if (-not (Test-Path $want)) {
+            throw "expected $want, built: $((Get-ChildItem dist/*.exe).Name -join ', ')"
+          }
       - name: Publish
         if: startsWith(github.ref, 'refs/tags/')
         env:
