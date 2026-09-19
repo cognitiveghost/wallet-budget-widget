@@ -76,7 +76,20 @@ function build(rawData, todayISO) {
   // Everyday net flow: what the last RATE_DAYS did that the calendar does not
   // already account for, averaged over a window long enough that one big
   // Saturday does not become the forecast.
-  const rate = netRate(balanceRecords, balanceOrders, fmt(dayOf(todayISO) - RATE_DAYS * DAY), todayISO);
+  //
+  // The window stops YESTERDAY. The projected leg starts at today+1, so today
+  // belongs to neither — and it must not belong to both. An order due today has
+  // usually not produced its record yet, so a window that reached today would
+  // read it as an order that never fired and push the rate up by its whole
+  // amount, while the forward leg never books the payment at all. The far end
+  // of the line then *rises* on the day a bill falls due. Today is a part-day
+  // average in any case, which is not what a daily rate is asking for.
+  const rate = netRate(
+    balanceRecords,
+    balanceOrders,
+    fmt(dayOf(todayISO) - RATE_DAYS * DAY),
+    fmt(dayOf(todayISO) - DAY),
+  );
 
   const total = included.reduce((sum, a) => sum + (Number(a.balance && a.balance.currentBalance) || 0), 0);
 

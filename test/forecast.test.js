@@ -111,12 +111,15 @@ test('no records yields a zero rate', () => {
 // -------------------------------------------------------- projectBudget
 
 test('a mid-period burn rate extrapolates to the period end', () => {
-  // 100 spent over 10 elapsed days of 30 => 10/day => 300 projected.
+  // 100 spent over the 9 COMPLETE days Sep 1-9 => 11.11/day, and 20 days are
+  // left after today => 222. Today is in neither term: it is half a day of
+  // evidence, and counting it in both (a rate day AND a day remaining) is what
+  // made a 30-day month project over 31 days.
   const b = budget({ spending: { current: { spent: 100, effectiveLimit: 300, periodStart: '2026-09-01', periodEnd: '2026-09-30' } } });
   const r = f.projectBudget(b, [], [rec(-100, { recordDate: '2026-09-05T12:00:00Z' })], '2026-09-10');
   assert.strictEqual(r.spent, 100);
-  assert.strictEqual(Math.round(r.projected), 300);
-  assert.strictEqual(Math.round(r.ratio * 100), 100);
+  assert.strictEqual(Math.round(r.projected), 322);
+  assert.strictEqual(Math.round(r.discretionary), 222);
 });
 
 test('a scheduled-only budget is projected from its known payments, not a daily rate', () => {
@@ -136,10 +139,10 @@ test('projection combines spent, scheduled and discretionary', () => {
   const rs = [rec(-100, { recordDate: '2026-09-05T12:00:00Z' })];
   const b = budget({ limit: 500, spending: { current: { spent: 100, effectiveLimit: 500, periodStart: '2026-09-01', periodEnd: '2026-09-30' } } });
   const r = f.projectBudget(b, [o], rs, '2026-09-10');
-  // spent 100 + scheduled 50 + discretionary (100/10 * 20 = 200) = 350
+  // spent 100 + scheduled 50 + discretionary (100/9 complete days * 20 = 222)
   assert.strictEqual(r.scheduled, 50);
-  assert.strictEqual(Math.round(r.discretionary), 200);
-  assert.strictEqual(Math.round(r.projected), 350);
+  assert.strictEqual(Math.round(r.discretionary), 222);
+  assert.strictEqual(Math.round(r.projected), 372);
 });
 
 test('overshoot is the projected excess over the effective limit, or zero', () => {
@@ -166,10 +169,10 @@ test('the first day of a period does not divide by zero', () => {
 });
 
 test('a weekly period projects over its own seven days', () => {
-  // 40 spent over 4 elapsed days of a 7-day period => 10/day => 70.
+  // 40 spent over the 3 complete days Sep 14-16 => 13.33/day, 3 days left.
   const b = budget({ spending: { current: { spent: 40, effectiveLimit: 150, periodStart: '2026-09-14', periodEnd: '2026-09-20' } } });
   const r = f.projectBudget(b, [], [rec(-40, { recordDate: '2026-09-15T12:00:00Z' })], '2026-09-17');
-  assert.strictEqual(Math.round(r.projected), 70);
+  assert.strictEqual(Math.round(r.projected), 80);
 });
 
 test('a budget with no spending block projects as zero rather than throwing', () => {
@@ -329,4 +332,31 @@ test('an unpaid scheduled expense pushes the net rate up to compensate', () => {
   // correction forward rather than the projection quietly losing the money.
   const o = order({ amount: 50 });
   assert.strictEqual(f.netRate([], [o], ...WIN), 50 / 30);
+});
+
+test('a record dated ahead of today reaches the projected line', () => {
+  // Card payments arrive from bank sync only after they happen, so a record in
+  // the future is one somebody entered by hand — a cash payment they already
+  // know about. It used to be dropped, and the money never appeared at all.
+  const future = [{ recordDate: '2026-09-25T12:00:00Z', counterParty: 'Dentist', convertedAmount: { value: -500 } }];
+  const r = f.runway(future, [], 3000, '2026-09-01', '2026-09-30', '2026-09-19', 0);
+  assert.strictEqual(r.end, 2500);
+  assert.deepStrictEqual(r.planned, [{ date: '2026-09-25', signed: -500, names: ['Dentist'] }]);
+});
+
+test('a future record and a standing order on one day are one mark', () => {
+  const o = order({ amount: 40 }); // the helper's rule already lands on the 25th
+  const future = [{ recordDate: '2026-09-25T12:00:00Z', counterParty: 'Dentist', convertedAmount: { value: -500 } }];
+  const r = f.runway(future, [o], 3000, '2026-09-01', '2026-09-30', '2026-09-19', 0);
+  assert.strictEqual(r.end, 2460);
+  assert.strictEqual(r.planned.length, 1);
+  assert.strictEqual(r.planned[0].signed, -540);
+});
+
+test('a past record is history, not a second entry in the projection', () => {
+  const past = [{ recordDate: '2026-09-10T12:00:00Z', convertedAmount: { value: -500 } }];
+  const r = f.runway(past, [], 3000, '2026-09-01', '2026-09-30', '2026-09-19', 0);
+  assert.strictEqual(r.actual[r.actual.length - 1].balance, 2500);
+  assert.strictEqual(r.end, 2500);
+  assert.deepStrictEqual(r.planned, []);
 });

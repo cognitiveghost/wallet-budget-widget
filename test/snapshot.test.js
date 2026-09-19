@@ -292,7 +292,9 @@ test('a bill bigger than the order that scheduled it is not counted twice', () =
   // The window holds two occurrences of the order and the two bills that paid
   // them: 176 went out, 120 of it was already on the calendar, so only the 56
   // of excess is rate. Counted twice it would have been the whole 176.
-  assert.ok(Math.abs(s.ratePerDay - (-56 / 61)) < 0.01, `rate was ${s.ratePerDay}`);
+  // 60 days, not 61: the window ends yesterday, because today belongs to the
+  // projected leg.
+  assert.ok(Math.abs(s.ratePerDay - (-56 / 60)) < 0.01, `rate was ${s.ratePerDay}`);
 });
 
 test('a standing order on an excluded account stays off the line', () => {
@@ -309,4 +311,36 @@ test('a standing order on an excluded account stays off the line', () => {
   const s = build(raw({ accounts, orders }), '2026-09-18');
   assert.strictEqual(s.nextMonth.expense, 0);
   assert.strictEqual(s.nextMonth.closing, 1000);
+});
+
+test('a bill falling due today cannot make the forecast more optimistic', () => {
+  // The two windows used to overlap on today: the rate was calibrated up TO
+  // today while the projected leg started AFTER it. A standing order due today
+  // has usually not produced its record yet, so the backward window read it as
+  // an order that never fired and pushed the rate up by its whole amount —
+  // and the forward leg, starting tomorrow, never booked the payment. A 1200
+  // rent due today moved the far end of the line 826 UP.
+  const acct = [{ id: 'a1', name: 'Main', balance: { currencyCode: 'EUR', currentBalance: 3000 } }];
+  const rent = (d) => [{ id: 'o1', name: 'Rent', amount: 1200, type: 'expense', accountId: 'a1', dueDate: d }];
+  const end = (orders) => build(raw({ accounts: acct, orders }), '2026-09-19').runway.end;
+
+  assert.strictEqual(end([]), 3000);
+  assert.ok(end(rent('2026-09-19')) <= end([]), 'a bill due today raised the balance');
+  assert.strictEqual(end(rent('2026-09-20')), 1800);
+});
+
+test('the plot is handed the planned payments its projected leg is made of', () => {
+  const acct = [{ id: 'a1', name: 'Main', balance: { currencyCode: 'EUR', currentBalance: 3000 } }];
+  const orders = [
+    { id: 'o1', name: 'Rent', amount: 1200, type: 'expense', accountId: 'a1', dueDate: '2026-09-25' },
+    { id: 'o2', name: 'Broadband', amount: 40, type: 'expense', accountId: 'a1', dueDate: '2026-09-25' },
+    { id: 'o3', name: 'Salary', amount: 2400, type: 'income', accountId: 'a1', dueDate: '2026-09-28' },
+  ];
+  const { planned } = build(raw({ accounts: acct, orders }), '2026-09-19').runway;
+
+  // One mark per day, not per order: the balance only moves once that day.
+  assert.deepStrictEqual(planned.map((p) => p.date), ['2026-09-25', '2026-09-28']);
+  assert.strictEqual(planned[0].signed, -1240);
+  assert.deepStrictEqual(planned[0].names, ['Rent', 'Broadband']);
+  assert.strictEqual(planned[1].signed, 2400);
 });

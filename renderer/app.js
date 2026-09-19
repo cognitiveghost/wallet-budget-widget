@@ -149,8 +149,9 @@ function renderRunway(root, snapshot) {
   }
 
   const W = Math.max(520, Math.round(root.clientWidth || 900));
-  const H = 198;
-  const PAD = { l: 4, r: 176, t: 32, b: 26 };
+  const H = 220;
+  // The bottom margin carries two rows now: the payment rug, then the dates.
+  const PAD = { l: 4, r: 176, t: 32, b: 48 };
 
   const values = points.map((p) => p.balance);
   // Scale to the money that is actually there. Anchoring the floor at zero
@@ -163,6 +164,7 @@ function renderRunway(root, snapshot) {
   lo -= span * 0.16;
   hi += span * 0.16;
 
+  const at = new Map(points.map((p, i) => [p.date, i]));
   const x = (i) => PAD.l + (i / (points.length - 1)) * (W - PAD.l - PAD.r);
   const y = (v) => PAD.t + (1 - (v - lo) / (hi - lo)) * (H - PAD.t - PAD.b);
 
@@ -188,6 +190,76 @@ function renderRunway(root, snapshot) {
       stroke: '#ff5c39', 'stroke-width': 1, 'stroke-dasharray': '3 4', opacity: .6,
     }));
     svg.append(svgEl('text', { x: PAD.l, y: y(0) - 6, fill: '#ff5c39', 'font-size': 11 }, 'zero'));
+  }
+
+  // ------------------------------------------------------- planned payments
+  // Every step in the projected line is a dated payment, and until now the
+  // plot showed the step without ever saying what it was or when. The rug
+  // under the axis marks each planned day — down in brass for money out, up in
+  // teal for money in, tall for a big one — and a guide runs from each mark to
+  // the point on the line it bends, so a drop can be read back to its date.
+  // Drawn before the line so the guides sit under it.
+  const planned = (snapshot.runway.planned || []).filter((p) => at.has(p.date));
+  if (planned.length) {
+    const RUG = H - PAD.b + 8;
+    // max(…, 1): a standing order can carry a zero amount, and a NaN tick
+    // height writes an SVG attribute that drops the mark silently.
+    const biggest = Math.max(1, ...planned.map((p) => Math.abs(p.signed)));
+    // Only the payments that actually shape the line are captioned. Twenty
+    // captions across two months is not a plot, and the due list already has
+    // every date in full. The biggest payment out leads, because that is the
+    // one that threatens the balance; the biggest one in gets a caption too
+    // when it is far enough away to be legible beside it.
+    const biggestOf = (keep) => planned
+      .filter(keep)
+      .sort((a, b) => Math.abs(b.signed) - Math.abs(a.signed))[0];
+    const lead = biggestOf((p) => p.signed < 0) || biggestOf(() => true);
+    const named = [lead];
+    const other = biggestOf((p) => p.signed > 0);
+    if (other && Math.abs(x(at.get(other.date)) - x(at.get(lead.date))) > 110) named.push(other);
+    const isNamed = new Set(named.map((p) => p.date));
+
+    svg.append(svgEl('line', {
+      x1: todayX, x2: endX, y1: RUG, y2: RUG,
+      stroke: '#8a9099', 'stroke-width': 1, opacity: .18,
+    }));
+
+    for (const p of planned) {
+      const px = x(at.get(p.date));
+      const out = p.signed < 0;
+      const colour = out ? '#d7a94b' : '#6fd0ba';
+      const tick = 3 + 6 * (Math.abs(p.signed) / biggest);
+      const captioned = isNamed.has(p.date);
+
+      const g = svgEl('g', {});
+      // Hover carries the full story for the marks that have no caption.
+      g.append(svgEl('title', {}, `${p.names.join(', ')} \u2014 ${money(p.signed)} on ${dayMonth(p.date)}`));
+      g.append(svgEl('line', {
+        x1: px, x2: px, y1: y(points[at.get(p.date)].balance), y2: RUG,
+        stroke: colour, 'stroke-width': 1, opacity: captioned ? .38 : .14,
+      }));
+      g.append(svgEl('line', {
+        x1: px, x2: px, y1: RUG, y2: out ? RUG + tick : RUG - tick,
+        stroke: colour, 'stroke-width': 2, 'stroke-linecap': 'round',
+      }));
+      svg.append(g);
+    }
+
+    for (const p of named) {
+      const px = x(at.get(p.date));
+      // Anchored away from whichever edge it is near, so a payment on the last
+      // day of the plot does not write itself off the side.
+      const near = px > endX - 90 ? 'end' : px < 90 ? 'start' : 'middle';
+      const rest = p.names.length > 1 ? ` +${p.names.length - 1}` : '';
+      svg.append(svgEl('text', {
+        // An `end` anchor grows leftward and a `start` anchor rightward, so
+        // the nudge has to follow the anchor, not oppose it.
+        x: px + (near === 'end' ? -4 : near === 'start' ? 4 : 0),
+        y: RUG + 22,
+        fill: p.signed < 0 ? '#d7a94b' : '#6fd0ba',
+        'font-size': 11, 'text-anchor': near, class: 'plot-now',
+      }, `${dayMonth(p.date)} \u00b7 ${p.names[0]}${rest} ${money0(Math.abs(p.signed))}`));
+    }
   }
 
   const line = (slice, offset) => slice
@@ -223,7 +295,7 @@ function renderRunway(root, snapshot) {
   }, `on ${dayMonth(points[points.length - 1].date)}`));
 
   const foot = (tx, text, anchor) => svgEl('text', {
-    x: tx, y: H - 8, fill: '#8a9099', 'font-size': 12, 'text-anchor': anchor || 'start',
+    x: tx, y: H - 6, fill: '#8a9099', 'font-size': 12, 'text-anchor': anchor || 'start',
   }, text);
   svg.append(foot(PAD.l, dayMonth(points[0].date)));
   svg.append(foot(todayX, 'today', 'middle'));
@@ -261,9 +333,13 @@ function renderRunway(root, snapshot) {
   const low = ahead.reduce((a, b) => (b.balance < a.balance ? b : a), ahead[0]);
   if (low.balance < end - span * 0.12 && low.balance >= 0) {
     const lx = x(points.indexOf(low));
-    svg.append(svgEl('circle', { cx: lx, cy: y(low.balance), r: 3, fill: '#8a9099' }));
+    const ly = y(low.balance);
+    // Below the point by default, but a low that sits near the floor would
+    // write its caption over the payment rug, so it goes above instead.
+    const below = ly + 18 < H - PAD.b - 6;
+    svg.append(svgEl('circle', { cx: lx, cy: ly, r: 3, fill: '#8a9099' }));
     svg.append(svgEl('text', {
-      x: lx, y: y(low.balance) + 18, fill: '#8a9099', 'font-size': 12,
+      x: lx, y: below ? ly + 18 : ly - 12, fill: '#8a9099', 'font-size': 12,
       'text-anchor': 'middle', class: 'plot-now',
     }, `low ${money0(low.balance)} ${dayMonth(low.date)}`));
   }

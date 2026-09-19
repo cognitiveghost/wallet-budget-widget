@@ -15,7 +15,11 @@ async function cycle({ api, onSnapshot, onError }) {
   running = true;
   try {
     const t = today();
-    const { start, end } = monthBounds(t);
+    const { start } = monthBounds(t);
+    // Out to the end of NEXT month, because that is how far the line runs and
+    // a hand-entered record out there now moves it. Fetching only to this
+    // month's end meant next month's cash payments were never even asked for.
+    const { end } = monthBounds(t, 1);
     const [budgets, orders, accounts] = await Promise.all([
       api.budgets(), api.standingOrders(), api.accounts(),
     ]);

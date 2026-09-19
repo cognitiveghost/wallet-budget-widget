@@ -134,7 +134,7 @@ text.plot-end {
   letter-spacing: -0.02em;
 }
 
-#runway svg { display: block; width: 100%; height: 198px; overflow: visible; }
+#runway svg { display: block; width: 100%; height: 220px; overflow: visible; }
 
 #verdict {
   margin: 10px 0 0;

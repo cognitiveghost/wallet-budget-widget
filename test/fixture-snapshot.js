@@ -12,11 +12,11 @@ const FIXTURE = {
       "progress": 3.06,
       "spent": 367.36,
       "scheduled": 0,
-      "discretionary": 244.9066666666667,
-      "projected": 612.2666666666667,
+      "discretionary": 259.31294117647064,
+      "projected": 626.6729411764707,
       "limit": 120,
-      "ratio": 5.102222222222222,
-      "overshoot": 492.26666666666665,
+      "ratio": 5.222274509803922,
+      "overshoot": 506.67294117647066,
       "crossesOn": null
     },
     {
@@ -28,11 +28,11 @@ const FIXTURE = {
       "progress": 2.04,
       "spent": 367.68,
       "scheduled": 0,
-      "discretionary": 245.11999999999995,
-      "projected": 612.8,
+      "discretionary": 216.02823529411762,
+      "projected": 583.7082352941177,
       "limit": 180,
-      "ratio": 3.404444444444444,
-      "overshoot": 432.79999999999995,
+      "ratio": 3.242823529411765,
+      "overshoot": 403.7082352941177,
       "crossesOn": null
     },
     {
@@ -44,11 +44,11 @@ const FIXTURE = {
       "progress": 2.3,
       "spent": 207.03,
       "scheduled": 0,
-      "discretionary": 138.02,
-      "projected": 345.05,
+      "discretionary": 112.42588235294119,
+      "projected": 319.4558823529412,
       "limit": 90,
-      "ratio": 3.833888888888889,
-      "overshoot": 255.05,
+      "ratio": 3.549509803921569,
+      "overshoot": 229.45588235294122,
       "crossesOn": null
     },
     {
@@ -60,11 +60,11 @@ const FIXTURE = {
       "progress": 1.29,
       "spent": 257.07,
       "scheduled": 0,
-      "discretionary": 171.38000000000005,
-      "projected": 428.45000000000005,
+      "discretionary": 133.17176470588237,
+      "projected": 390.24176470588236,
       "limit": 200,
-      "ratio": 2.14225,
-      "overshoot": 228.45000000000005,
+      "ratio": 1.9512088235294118,
+      "overshoot": 190.24176470588236,
       "crossesOn": null
     },
     {
@@ -76,10 +76,10 @@ const FIXTURE = {
       "progress": 0.62,
       "spent": 73.26,
       "scheduled": 0,
-      "discretionary": 29.303999999999995,
-      "projected": 102.564,
+      "discretionary": 2.425,
+      "projected": 75.685,
       "limit": 150,
-      "ratio": 0.6837599999999999,
+      "ratio": 0.5045666666666667,
       "overshoot": 0,
       "crossesOn": null
     },
@@ -198,190 +198,255 @@ const FIXTURE = {
       },
       {
         "date": "2026-09-19",
-        "balance": 2254.71
+        "balance": 2257.24
       },
       {
         "date": "2026-09-20",
-        "balance": 2228.82
+        "balance": 2233.89
       },
       {
         "date": "2026-09-21",
-        "balance": 2202.94
+        "balance": 2210.53
       },
       {
         "date": "2026-09-22",
-        "balance": 2165.06
+        "balance": 2175.19
       },
       {
         "date": "2026-09-23",
-        "balance": 2139.17
+        "balance": 2151.83
       },
       {
         "date": "2026-09-24",
-        "balance": 2113.28
+        "balance": 2128.47
       },
       {
         "date": "2026-09-25",
-        "balance": 4567.39
+        "balance": 4585.12
       },
       {
         "date": "2026-09-26",
-        "balance": 4541.51
+        "balance": 4561.76
       },
       {
         "date": "2026-09-27",
-        "balance": 4515.62
+        "balance": 4538.41
       },
       {
         "date": "2026-09-28",
-        "balance": 4427.73
+        "balance": 4453.05
       },
       {
         "date": "2026-09-29",
-        "balance": 4401.84
+        "balance": 4429.7
       },
       {
         "date": "2026-09-30",
-        "balance": 4375.96
+        "balance": 4406.34
       },
       {
         "date": "2026-10-01",
-        "balance": 3200.07
+        "balance": 3232.98
       },
       {
         "date": "2026-10-02",
-        "balance": 3174.18
+        "balance": 3209.63
       },
       {
         "date": "2026-10-03",
-        "balance": 3148.29
+        "balance": 3186.27
       },
       {
         "date": "2026-10-04",
-        "balance": 3122.4
+        "balance": 3162.92
       },
       {
         "date": "2026-10-05",
-        "balance": 3057.52
+        "balance": 3100.56
       },
       {
         "date": "2026-10-06",
-        "balance": 3031.63
+        "balance": 3077.2
       },
       {
         "date": "2026-10-07",
-        "balance": 3005.74
+        "balance": 3053.85
       },
       {
         "date": "2026-10-08",
-        "balance": 2979.85
+        "balance": 3030.49
       },
       {
         "date": "2026-10-09",
-        "balance": 2953.96
+        "balance": 3007.14
       },
       {
         "date": "2026-10-10",
-        "balance": 2928.08
+        "balance": 2983.78
       },
       {
         "date": "2026-10-11",
-        "balance": 2902.19
+        "balance": 2960.43
       },
       {
         "date": "2026-10-12",
-        "balance": 2876.3
+        "balance": 2937.07
       },
       {
         "date": "2026-10-13",
-        "balance": 2850.41
+        "balance": 2913.71
       },
       {
         "date": "2026-10-14",
-        "balance": 2800.03
+        "balance": 2865.86
       },
       {
         "date": "2026-10-15",
-        "balance": 2774.14
+        "balance": 2842.5
       },
       {
         "date": "2026-10-16",
-        "balance": 2748.25
+        "balance": 2819.15
       },
       {
         "date": "2026-10-17",
-        "balance": 2722.36
+        "balance": 2795.79
       },
       {
         "date": "2026-10-18",
-        "balance": 2696.47
+        "balance": 2772.43
       },
       {
         "date": "2026-10-19",
-        "balance": 2670.59
+        "balance": 2749.08
       },
       {
         "date": "2026-10-20",
-        "balance": 2644.7
+        "balance": 2725.72
       },
       {
         "date": "2026-10-21",
-        "balance": 2618.81
+        "balance": 2702.37
       },
       {
         "date": "2026-10-22",
-        "balance": 2580.93
+        "balance": 2667.02
       },
       {
         "date": "2026-10-23",
-        "balance": 2555.04
+        "balance": 2643.67
       },
       {
         "date": "2026-10-24",
-        "balance": 2529.16
+        "balance": 2620.31
       },
       {
         "date": "2026-10-25",
-        "balance": 4983.27
+        "balance": 5076.95
       },
       {
         "date": "2026-10-26",
-        "balance": 4957.38
+        "balance": 5053.6
       },
       {
         "date": "2026-10-27",
-        "balance": 4931.49
+        "balance": 5030.24
       },
       {
         "date": "2026-10-28",
-        "balance": 4843.61
+        "balance": 4944.89
       },
       {
         "date": "2026-10-29",
-        "balance": 4817.72
+        "balance": 4921.53
       },
       {
         "date": "2026-10-30",
-        "balance": 4791.83
+        "balance": 4898.17
       },
       {
         "date": "2026-10-31",
-        "balance": 4765.94
+        "balance": 4874.82
       }
     ],
-    "end": 4765.94,
-    "monthEnd": 4375.96,
+    "planned": [
+      {
+        "date": "2026-09-22",
+        "signed": -11.99,
+        "names": [
+          "Spotify"
+        ]
+      },
+      {
+        "date": "2026-09-25",
+        "signed": 2480,
+        "names": [
+          "Salary"
+        ]
+      },
+      {
+        "date": "2026-09-28",
+        "signed": -62,
+        "names": [
+          "Insurance"
+        ]
+      },
+      {
+        "date": "2026-10-01",
+        "signed": -1150,
+        "names": [
+          "Rent"
+        ]
+      },
+      {
+        "date": "2026-10-05",
+        "signed": -39,
+        "names": [
+          "Gym"
+        ]
+      },
+      {
+        "date": "2026-10-14",
+        "signed": -24.5,
+        "names": [
+          "Phone"
+        ]
+      },
+      {
+        "date": "2026-10-22",
+        "signed": -11.99,
+        "names": [
+          "Spotify"
+        ]
+      },
+      {
+        "date": "2026-10-25",
+        "signed": 2480,
+        "names": [
+          "Salary"
+        ]
+      },
+      {
+        "date": "2026-10-28",
+        "signed": -62,
+        "names": [
+          "Insurance"
+        ]
+      }
+    ],
+    "end": 4874.82,
+    "monthEnd": 4406.34,
     "monthEndDate": "2026-09-30"
   },
-  "ratePerDay": -25.89,
+  "ratePerDay": -23.36,
   "nextMonth": {
     "start": "2026-10-01",
     "end": "2026-10-31",
-    "opening": 4375.96,
+    "opening": 4406.34,
     "income": 2480,
     "expense": 1287.49,
-    "rate": -802.52,
-    "closing": 4765.94
+    "rate": -724.03,
+    "closing": 4874.82
   },
   "currency": "EUR",
   "excludedAccounts": [

@@ -128,8 +128,6 @@ function projectBudget(budget, orders, records, todayISO) {
   const end = cur.periodEnd;
   const today = todayISO;
 
-  // Elapsed counts today as a day in progress, so day one divides by 1, not 0.
-  const elapsed = Math.max(1, Math.round((dayOf(today) - dayOf(start)) / DAY) + 1);
   const remaining = Math.max(0, Math.round((dayOf(end) - dayOf(today)) / DAY));
 
   if (remaining === 0) {
@@ -146,7 +144,12 @@ function projectBudget(budget, orders, records, todayISO) {
 
   // Discretionary: rate derived only from this budget's own scoped records.
   const scopedRecords = (records || []).filter((r) => inScope(budget, r));
-  const rate = discretionaryRate(scopedRecords, scopedOrders, start, today);
+  // Calibrate on whole days only. Today is claimed by the forward leg below
+  // (which starts at today+1), so letting it also feed the backward window
+  // counts it twice with opposite signs: an order due today is subtracted as
+  // "never fired" and never re-added, which makes the projection *rise* on the
+  // day a bill falls due. Today is a part-day average anyway.
+  const rate = discretionaryRate(scopedRecords, scopedOrders, start, addDays(today, -1));
   const discretionary = rate * remaining;
 
   const projected = spent + scheduled + discretionary;
@@ -216,8 +219,27 @@ function runway(records, orders, startBalance, periodStartISO, periodEndISO, tod
   }
 
   const events = new Map();
-  for (const e of upcoming(orders, fmt(today + DAY), periodEndISO)) {
-    events.set(e.date, (events.get(e.date) || 0) + e.signed);
+  const add = (date, signed, name) => {
+    const slot = events.get(date) || { signed: 0, names: [] };
+    slot.signed += signed;
+    if (name) slot.names.push(name);
+    events.set(date, slot);
+  };
+  for (const e of upcoming(orders, fmt(today + DAY), periodEndISO)) add(e.date, e.signed, e.name);
+
+  // A record dated ahead of today is one somebody entered by hand. Card
+  // payments reach Wallet through bank sync only after they have happened, so
+  // nothing arriving from the sync is ever in the future — a future record is
+  // a cash payment the user already knows is coming, and it belongs on the
+  // line. These used to be dropped: the money simply never appeared.
+  // ponytail: a hand-entered record that ALSO has a standing order behind it
+  // is counted twice. The payload gives nothing to tell the two apart; drop
+  // this if it ever bites.
+  for (const r of records || []) {
+    if (r.transfer) continue;
+    const ms = dayOf(r.recordDate);
+    if (!Number.isFinite(ms) || ms <= today || ms > end) continue;
+    add(fmt(ms), signedOf(r), r.counterParty || 'Entered by hand');
   }
 
   const rate = Number(ratePerDay) || 0;
@@ -225,11 +247,19 @@ function runway(records, orders, startBalance, periodStartISO, periodEndISO, tod
   let p = projected[0].balance;
   for (let ms = today + DAY; ms <= end; ms += DAY) {
     const d = fmt(ms);
-    p += (events.get(d) || 0) + rate;
+    p += ((events.get(d) || {}).signed || 0) + rate;
     projected.push({ date: d, balance: Math.round(p * 100) / 100 });
   }
 
-  return { actual, projected, end: projected[projected.length - 1].balance };
+  // The planned payments the projected leg is made of, handed back so the plot
+  // can mark the dates rather than leaving them as unexplained kinks in a line.
+  // Grouped by day: two orders on the same date are one mark on the plot, and
+  // the balance only moves once that day anyway.
+  const planned = [...events]
+    .map(([date, e]) => ({ date, signed: Math.round(e.signed * 100) / 100, names: e.names }))
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+
+  return { actual, projected, planned, end: projected[projected.length - 1].balance };
 }
 
 module.exports = { inScope, discretionaryRate, netRate, projectBudget, runway, amountOf };

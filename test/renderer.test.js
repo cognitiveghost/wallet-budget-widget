@@ -36,3 +36,17 @@ test('the content policy allows the bundled font and nothing remote', () => {
   assert.match(csp[1], /default-src 'none'/);
   assert.doesNotMatch(csp[1], /https?:/);
 });
+
+// The preview harness is a second copy of the window's markup, and it drifted:
+// #next was added to renderer/index.html and not here, so render() threw on a
+// null element and every panel after it — budgets, due, inbox, sync — silently
+// stopped drawing in the one tool the README points at for UI work.
+test('the preview harness carries every element the renderer looks up', () => {
+  const js = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'app.js'), 'utf8');
+  const preview = fs.readFileSync(path.join(__dirname, 'preview.html'), 'utf8');
+  const ids = new Set([...js.matchAll(/\$\('([-\w]+)'\)/g)].map((m) => m[1]));
+  assert.ok(ids.size > 5, `only found ${ids.size} lookups — the scan broke`);
+  for (const id of ids) {
+    assert.match(preview, new RegExp(`id="${id}"`), `preview.html has no #${id}`);
+  }
+});

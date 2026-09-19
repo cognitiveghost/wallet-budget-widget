@@ -109,6 +109,29 @@ bill that comes in higher than its order leaves only the excess. An order that
 never actually fires pushes the rate back up to compensate, instead of the
 projection quietly losing the money.
 
+The measured window stops at **yesterday**, and the projected leg starts at
+today. Today belongs to neither, because it must not belong to both: a standing
+order due today has usually not produced its record yet, so a window reaching
+today reads it as an order that never fired and pushes the rate up by its whole
+amount — while the forward leg, starting tomorrow, never books the payment. The
+far end of the line then *rose* on the day a bill fell due. Today is half a day
+of evidence in any case, which is not what a daily rate is asking for.
+
+A record dated ahead of today goes on the line too. Card payments reach Wallet
+through bank sync only after they have happened, so nothing arriving from the
+sync is ever in the future — a future record is a cash payment somebody entered
+because they know it is coming, and it is as real as a standing order. The
+records window runs to the end of next month for the same reason: the line runs
+that far, so the records have to be asked for that far.
+
+Every step in the projected line is a dated payment, so the plot says which.
+Under the axis is a rug: one mark per planned day, down in brass for money out,
+up in teal for money in, taller for a bigger one, and a faint guide from each
+mark to the point on the line it bends. The largest payment out is captioned
+with its date, and the largest one in when the two are far enough apart to read.
+Hovering any mark names the orders behind it. Every date in full is the job of
+the due list beside the plot, not the plot.
+
 Two months in view moves where the news is. The end of the line stops being
 the worst point once payday lifts it again, so the low point in between is
 marked, and the day the balance would reach zero is marked in the alarm
@@ -125,6 +148,12 @@ irregular spending.
 - **No bank-sync history.** The API exposes no sync log or last-sync timestamp,
   so the sync panel reports the age of each account's newest bank record as a
   proxy for freshness.
+- **Transfers off the counted accounts.** A transfer from a counted account to
+  an archived, excluded-from-stats or foreign-currency one is money genuinely
+  leaving the line, but it is filtered out with every other transfer. Today's
+  balance stays exact — the walk is anchored to the real account total — but
+  the step is missing from the history, and the everyday rate never learns
+  about money moved that way.
 - **Review state, not rules.** "Needs review" lists records Wallet reports as
   `uncleared` or `waitForAssign` — imported but never confirmed. The API
   exposes no categorisation rules, so a record a rule got wrong looks the same
