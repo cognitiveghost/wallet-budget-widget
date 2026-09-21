@@ -380,3 +380,15 @@ test('a budget with no past periods reports no median rather than omitting the f
   assert.deepStrictEqual(s.budgets[0].history, []);
   assert.strictEqual(s.budgets[0].overCount, 0);
 });
+
+test('order items reach the runway and suppress a paid occurrence', () => {
+  const orders = [{ id: 'o1', name: 'Rent', amount: 1000, type: 'expense', accountId: 'a1',
+    generateFromDate: '2026-01-25', recurrenceRule: 'FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=25' }];
+  const accounts = [{ id: 'a1', name: 'Main', balance: { currentBalance: 5000, currencyCode: 'EUR' }, recordStats: {} }];
+  const orderItems = [{ id: 'i1', standingOrderId: 'o1', originalDate: '2026-09-25', dismissed: true }];
+
+  const withItems = build({ budgets: [], orders, accounts, records: [], uncategorized: [], orderItems }, '2026-09-18');
+  const without = build({ budgets: [], orders, accounts, records: [], uncategorized: [] }, '2026-09-18');
+
+  assert.ok(withItems.runway.end > without.runway.end, 'the dismissed rent must not be deducted');
+});

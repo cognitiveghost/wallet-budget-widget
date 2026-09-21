@@ -33,7 +33,10 @@ function monthBounds(todayISO, offset = 0) {
 }
 
 function build(rawData, todayISO) {
-  const { budgets = [], orders = [], accounts = [], records = [], uncategorized = [] } = rawData;
+  const {
+    budgets = [], orders = [], accounts = [], records = [], uncategorized = [],
+    categories = [], orderItems = [],
+  } = rawData;
   const { start, end } = monthBounds(todayISO);
 
   const projected = budgets.map((b) => {
@@ -127,7 +130,7 @@ function build(rawData, todayISO) {
   // The line runs to the end of next month: this month's closing balance is
   // only half an answer when rent and payday both land on the far side of it.
   const next = monthBounds(todayISO, 1);
-  const line = runway(balanceRecords, balanceOrders, opening, start, next.end, todayISO, rate);
+  const line = runway(balanceRecords, balanceOrders, opening, start, next.end, todayISO, rate, orderItems);
   const balanceOn = (d) => {
     const hit = line.projected.find((x) => x.date === d) || line.actual.find((x) => x.date === d);
     return hit ? hit.balance : null;

@@ -26,6 +26,8 @@ test('spending from before this month still feeds a long budget period', async (
       spending: { current: { spent: 300, effectiveLimit: 1000, periodStart, periodEnd } },
     }],
     standingOrders: async () => [],
+    categories: async () => [],
+    orderItems: async () => [],
     accounts: async () => [{ id: 'a1', name: 'A', balance: { currentBalance: 0, currencyCode: 'EUR' }, recordStats: {} }],
     records: async (params) => (params.categoryId ? [] : [
       { id: 'r1', accountId: 'a1', convertedAmount: -300, recordDate: `${oldRecord}T12:00:00Z` },
@@ -39,4 +41,41 @@ test('spending from before this month still feeds a long budget period', async (
   assert.ok(snapshot, 'no snapshot was produced');
   assert.ok(snapshot.budgets[0].discretionary > 0,
     `discretionary was ${snapshot.budgets[0].discretionary} — the record was filtered out before build()`);
+});
+
+const { refreshNow } = poll;
+
+test('the cycle fetches categories and order items alongside everything else', async () => {
+  const calls = [];
+  const api = {
+    budgets: async () => { calls.push('budgets'); return []; },
+    standingOrders: async () => { calls.push('orders'); return []; },
+    accounts: async () => { calls.push('accounts'); return []; },
+    categories: async () => { calls.push('categories'); return [{ id: 'c1', cardinality: 'must' }]; },
+    orderItems: async () => { calls.push('items'); return [{ id: 'i1', standingOrderId: 'o1', recordIds: [] }]; },
+    records: async () => { calls.push('records'); return []; },
+    rateLimit: () => ({ remaining: 200, limit: 300 }),
+  };
+  let snap = null;
+  await refreshNow({ api, onSnapshot: (s) => { snap = s; }, onError: (e) => { throw e; } });
+  assert.ok(calls.includes('categories'), 'categories must be fetched');
+  assert.ok(calls.includes('items'), 'order items must be fetched');
+  assert.ok(snap, 'a snapshot must still be produced');
+});
+
+test('a failing order-items call does not take the whole cycle down', async () => {
+  const api = {
+    budgets: async () => [],
+    standingOrders: async () => [],
+    accounts: async () => [],
+    categories: async () => { throw new Error('categories exploded'); },
+    orderItems: async () => { throw new Error('items exploded'); },
+    records: async () => [],
+    rateLimit: () => ({ remaining: 200, limit: 300 }),
+  };
+  let snap = null;
+  let err = null;
+  await refreshNow({ api, onSnapshot: (s) => { snap = s; }, onError: (e) => { err = e; } });
+  assert.ok(snap, 'the dashboard still renders without the two optional calls');
+  assert.strictEqual(err, null);
 });

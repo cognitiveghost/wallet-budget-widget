@@ -20,8 +20,13 @@ async function cycle({ api, onSnapshot, onError }) {
     // a hand-entered record out there now moves it. Fetching only to this
     // month's end meant next month's cash payments were never even asked for.
     const { end } = monthBounds(t, 1);
-    const [budgets, orders, accounts] = await Promise.all([
-      api.budgets(), api.standingOrders(), api.accounts(),
+    // Categories and order items are enrichment, not structure: the dashboard
+    // is correct without either, so neither is allowed to fail the cycle.
+    // `budgets`, `orders` and `accounts` are not optional and still throw.
+    const optional = (p) => p.then((x) => x, () => []);
+
+    const [budgets, orders, accounts, categories] = await Promise.all([
+      api.budgets(), api.standingOrders(), api.accounts(), optional(api.categories()),
     ]);
     // 90 days of history feeds the discretionary rate; the runway needs only
     // this month, and the wider window is a superset of it.
@@ -29,6 +34,9 @@ async function cycle({ api, onSnapshot, onError }) {
       .toISOString().slice(0, 10);
     const records = await api.records({ from, to: end });
     const uncategorized = await api.records({ from, to: end, categoryId: UNCATEGORIZED.join(',') });
+    // The same window the records use: an item older than the window can only
+    // settle a record the window does not contain.
+    const orderItems = await optional(api.orderItems({ from, to: end }));
 
     // The full window goes through untrimmed. Every consumer in build() does
     // its own date filtering, and budgets on a quarterly or yearly period need
@@ -37,7 +45,7 @@ async function cycle({ api, onSnapshot, onError }) {
     // ponytail: 90 days back. A yearly budget still sees a partial period;
     // widen the window if yearly budgets turn out to matter.
     onSnapshot(build({
-      budgets, orders, accounts, records, uncategorized,
+      budgets, orders, accounts, records, uncategorized, categories, orderItems,
       rateLimit: api.rateLimit(),
     }, t));
   } catch (err) {
