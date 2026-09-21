@@ -113,6 +113,62 @@ function discretionaryRate(records, orders, fromISO, toISO) {
   return Math.max(0, gross - scheduled) / days;
 }
 
+// Three closed periods is the floor for calling anything "usual". Two is an
+// anecdote, and a median of one is that one month wearing a confident label.
+const MIN_PERIODS = 3;
+
+// The true median: on an even count, the mean of the middle two. A budget
+// alternating 100 and 400 has a usual month of 250, not 100.
+function median(xs) {
+  if (!xs.length) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  const mid = s.length >> 1;
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+
+// What this budget's closed periods actually did. Server-computed by Wallet —
+// nothing here recomputes spending, it only decides which periods are
+// admissible evidence:
+//
+//   incomplete   a partial sum wearing a whole period's label
+//   pre-start    periods before the budget existed come back as zeroes, and
+//                eleven zeroes make every median zero
+//   current      still running, so 60% elapsed reads as 40% under
+//
+// `over` is judged against each period's OWN effectiveLimit. limitOverrides
+// mean the limit moves, and comparing March against September's limit invents
+// overruns that never happened.
+function budgetHistory(budget) {
+  const spending = budget.spending || {};
+  const past = spending.past || [];
+  const currentStart = (spending.current || {}).periodStart;
+  const startsAt = dayOf(budget.startDate);
+
+  const periods = past
+    .filter((x) => !x.incomplete)
+    .filter((x) => !currentStart || x.periodStart !== currentStart)
+    .filter((x) => !Number.isFinite(startsAt) || dayOf(x.periodEnd) >= startsAt)
+    .map((x) => {
+      const limit = Number(x.effectiveLimit) || 0;
+      const spent = Number(x.spent) || 0;
+      return {
+        period: x.period || '',
+        periodStart: x.periodStart,
+        periodEnd: x.periodEnd,
+        spent,
+        limit,
+        over: limit > 0 && spent > limit,
+      };
+    })
+    .sort((a, b) => (a.periodStart < b.periodStart ? -1 : a.periodStart > b.periodStart ? 1 : 0));
+
+  return {
+    periods,
+    median: periods.length >= MIN_PERIODS ? median(periods.map((x) => x.spent)) : null,
+    overCount: periods.filter((x) => x.over).length,
+  };
+}
+
 function projectBudget(budget, orders, records, todayISO) {
   const cur = (budget.spending && budget.spending.current) || null;
   const spent = cur ? Number(cur.spent) || 0 : 0;
@@ -262,4 +318,4 @@ function runway(records, orders, startBalance, periodStartISO, periodEndISO, tod
   return { actual, projected, planned, end: projected[projected.length - 1].balance };
 }
 
-module.exports = { inScope, discretionaryRate, netRate, projectBudget, runway, amountOf };
+module.exports = { inScope, discretionaryRate, netRate, projectBudget, runway, amountOf, budgetHistory };

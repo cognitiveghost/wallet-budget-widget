@@ -360,3 +360,116 @@ test('a past record is history, not a second entry in the projection', () => {
   assert.strictEqual(r.end, 2500);
   assert.deepStrictEqual(r.planned, []);
 });
+
+// ------------------------------------------------------------------ history
+
+const { budgetHistory } = require('../main/forecast');
+
+// A budget whose past periods are handed back by the server. `current` is
+// separate from `past` in the payload, but the guard is tested anyway: the
+// median must never include a period that is still running.
+const withPast = (past, extra = {}) => ({
+  id: 'b1', name: 'Transport', startDate: '2025-01-01', limit: 120,
+  spending: { current: { periodStart: '2026-09-01', periodEnd: '2026-09-30', spent: 367, effectiveLimit: 120 }, past },
+  ...extra,
+});
+
+const p = (periodStart, periodEnd, spent, effectiveLimit = 120, more = {}) =>
+  ({ period: periodStart.slice(0, 7), periodStart, periodEnd, spent, effectiveLimit, ...more });
+
+test('history is ordered oldest first and carries each period own limit', () => {
+  const h = budgetHistory(withPast([
+    p('2026-08-01', '2026-08-31', 200),
+    p('2026-06-01', '2026-06-30', 100),
+    p('2026-07-01', '2026-07-31', 300),
+  ]));
+  assert.deepStrictEqual(h.periods.map((x) => x.periodStart), ['2026-06-01', '2026-07-01', '2026-08-01']);
+  assert.deepStrictEqual(h.periods.map((x) => x.spent), [100, 300, 200]);
+});
+
+test('the median of three is the middle value', () => {
+  const h = budgetHistory(withPast([
+    p('2026-06-01', '2026-06-30', 100),
+    p('2026-07-01', '2026-07-31', 300),
+    p('2026-08-01', '2026-08-31', 200),
+  ]));
+  assert.strictEqual(h.median, 200);
+});
+
+test('an even count takes the mean of the middle two', () => {
+  const h = budgetHistory(withPast([
+    p('2026-05-01', '2026-05-31', 100),
+    p('2026-06-01', '2026-06-30', 200),
+    p('2026-07-01', '2026-07-31', 300),
+    p('2026-08-01', '2026-08-31', 500),
+  ]));
+  assert.strictEqual(h.median, 250);
+});
+
+test('under three usable periods there is no median', () => {
+  const h = budgetHistory(withPast([
+    p('2026-07-01', '2026-07-31', 300),
+    p('2026-08-01', '2026-08-31', 200),
+  ]));
+  assert.strictEqual(h.median, null);
+  assert.strictEqual(h.periods.length, 2);
+});
+
+test('incomplete periods are dropped — a partial sum is not a month', () => {
+  const h = budgetHistory(withPast([
+    p('2026-06-01', '2026-06-30', 100),
+    p('2026-07-01', '2026-07-31', 300),
+    p('2026-08-01', '2026-08-31', 5, 120, { incomplete: true }),
+  ]));
+  assert.deepStrictEqual(h.periods.map((x) => x.spent), [100, 300]);
+  assert.strictEqual(h.median, null, 'two survivors is under the floor');
+});
+
+test('periods that ended before the budget existed are dropped', () => {
+  const h = budgetHistory(withPast([
+    p('2024-11-01', '2024-11-30', 0),
+    p('2024-12-01', '2024-12-31', 0),
+    p('2026-06-01', '2026-06-30', 100),
+    p('2026-07-01', '2026-07-31', 300),
+    p('2026-08-01', '2026-08-31', 200),
+  ]));
+  assert.strictEqual(h.periods.length, 3, 'the two pre-startDate zeroes are gone');
+  assert.strictEqual(h.median, 200, 'zeroes would have dragged this to 100');
+});
+
+test('the current period never counts toward the median', () => {
+  const b = withPast([
+    p('2026-06-01', '2026-06-30', 100),
+    p('2026-07-01', '2026-07-31', 300),
+    p('2026-08-01', '2026-08-31', 200),
+    p('2026-09-01', '2026-09-30', 367), // same periodStart as spending.current
+  ]);
+  const h = budgetHistory(b);
+  assert.strictEqual(h.periods.length, 3);
+  assert.strictEqual(h.median, 200);
+});
+
+test('over is judged against the limit that was in force then', () => {
+  const h = budgetHistory(withPast([
+    p('2026-06-01', '2026-06-30', 200, 300), // limit was 300 then: not over
+    p('2026-07-01', '2026-07-31', 200, 120), // limit was 120 then: over
+    p('2026-08-01', '2026-08-31', 100, 120),
+  ]));
+  assert.deepStrictEqual(h.periods.map((x) => x.over), [false, true, false]);
+  assert.strictEqual(h.overCount, 1);
+});
+
+test('a budget with no spending payload yields an empty history, not a throw', () => {
+  const h = budgetHistory({ id: 'b9', name: 'New' });
+  assert.deepStrictEqual(h, { periods: [], median: null, overCount: 0 });
+});
+
+test('a zero limit is never over — an unlimited budget cannot overspend', () => {
+  const h = budgetHistory(withPast([
+    p('2026-06-01', '2026-06-30', 100, 0),
+    p('2026-07-01', '2026-07-31', 300, 0),
+    p('2026-08-01', '2026-08-31', 200, 0),
+  ]));
+  assert.strictEqual(h.overCount, 0);
+  assert.strictEqual(h.median, 200);
+});
