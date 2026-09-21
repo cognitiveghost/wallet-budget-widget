@@ -18,9 +18,98 @@ const FIXTURE = {
       "ratio": 5.222274509803922,
       "overshoot": 506.67294117647066,
       "crossesOn": null,
-      "history": [],
-      "median": null,
-      "overCount": 0
+      "history": [
+        {
+          "period": "2025-10",
+          "periodStart": "2025-10-01",
+          "periodEnd": "2025-10-31",
+          "spent": 186.89,
+          "limit": 120,
+          "over": true
+        },
+        {
+          "period": "2025-11",
+          "periodStart": "2025-11-01",
+          "periodEnd": "2025-11-30",
+          "spent": 229.11,
+          "limit": 120,
+          "over": true
+        },
+        {
+          "period": "2025-12",
+          "periodStart": "2025-12-01",
+          "periodEnd": "2025-12-31",
+          "spent": 166.18,
+          "limit": 120,
+          "over": true
+        },
+        {
+          "period": "2026-01",
+          "periodStart": "2026-01-01",
+          "periodEnd": "2026-01-31",
+          "spent": 218.03,
+          "limit": 120,
+          "over": true
+        },
+        {
+          "period": "2026-02",
+          "periodStart": "2026-02-01",
+          "periodEnd": "2026-02-28",
+          "spent": 108.99,
+          "limit": 120,
+          "over": false
+        },
+        {
+          "period": "2026-03",
+          "periodStart": "2026-03-01",
+          "periodEnd": "2026-03-31",
+          "spent": 93.24,
+          "limit": 120,
+          "over": false
+        },
+        {
+          "period": "2026-04",
+          "periodStart": "2026-04-01",
+          "periodEnd": "2026-04-30",
+          "spent": 93.94,
+          "limit": 120,
+          "over": false
+        },
+        {
+          "period": "2026-05",
+          "periodStart": "2026-05-01",
+          "periodEnd": "2026-05-31",
+          "spent": 138.21,
+          "limit": 120,
+          "over": true
+        },
+        {
+          "period": "2026-06",
+          "periodStart": "2026-06-01",
+          "periodEnd": "2026-06-30",
+          "spent": 91.36,
+          "limit": 120,
+          "over": false
+        },
+        {
+          "period": "2026-07",
+          "periodStart": "2026-07-01",
+          "periodEnd": "2026-07-31",
+          "spent": 240.07,
+          "limit": 120,
+          "over": true
+        },
+        {
+          "period": "2026-08",
+          "periodStart": "2026-08-01",
+          "periodEnd": "2026-08-31",
+          "spent": 236.33,
+          "limit": 120,
+          "over": true
+        }
+      ],
+      "median": 166.18,
+      "overCount": 7
     },
     {
       "id": "b2",
@@ -37,9 +126,98 @@ const FIXTURE = {
       "ratio": 3.242823529411765,
       "overshoot": 403.7082352941177,
       "crossesOn": null,
-      "history": [],
-      "median": null,
-      "overCount": 0
+      "history": [
+        {
+          "period": "2025-10",
+          "periodStart": "2025-10-01",
+          "periodEnd": "2025-10-31",
+          "spent": 156.2,
+          "limit": 180,
+          "over": false
+        },
+        {
+          "period": "2025-11",
+          "periodStart": "2025-11-01",
+          "periodEnd": "2025-11-30",
+          "spent": 153.47,
+          "limit": 180,
+          "over": false
+        },
+        {
+          "period": "2025-12",
+          "periodStart": "2025-12-01",
+          "periodEnd": "2025-12-31",
+          "spent": 206.48,
+          "limit": 180,
+          "over": true
+        },
+        {
+          "period": "2026-01",
+          "periodStart": "2026-01-01",
+          "periodEnd": "2026-01-31",
+          "spent": 148.59,
+          "limit": 180,
+          "over": false
+        },
+        {
+          "period": "2026-02",
+          "periodStart": "2026-02-01",
+          "periodEnd": "2026-02-28",
+          "spent": 153.56,
+          "limit": 180,
+          "over": false
+        },
+        {
+          "period": "2026-03",
+          "periodStart": "2026-03-01",
+          "periodEnd": "2026-03-31",
+          "spent": 134.27,
+          "limit": 180,
+          "over": false
+        },
+        {
+          "period": "2026-04",
+          "periodStart": "2026-04-01",
+          "periodEnd": "2026-04-30",
+          "spent": 134.79,
+          "limit": 180,
+          "over": false
+        },
+        {
+          "period": "2026-05",
+          "periodStart": "2026-05-01",
+          "periodEnd": "2026-05-31",
+          "spent": 140.24,
+          "limit": 180,
+          "over": false
+        },
+        {
+          "period": "2026-06",
+          "periodStart": "2026-06-01",
+          "periodEnd": "2026-06-30",
+          "spent": 186.52,
+          "limit": 180,
+          "over": true
+        },
+        {
+          "period": "2026-07",
+          "periodStart": "2026-07-01",
+          "periodEnd": "2026-07-31",
+          "spent": 191.51,
+          "limit": 180,
+          "over": true
+        },
+        {
+          "period": "2026-08",
+          "periodStart": "2026-08-01",
+          "periodEnd": "2026-08-31",
+          "spent": 160.6,
+          "limit": 180,
+          "over": false
+        }
+      ],
+      "median": 153.56,
+      "overCount": 3
     },
     {
       "id": "b4",
@@ -56,9 +234,98 @@ const FIXTURE = {
       "ratio": 3.549509803921569,
       "overshoot": 229.45588235294122,
       "crossesOn": null,
-      "history": [],
-      "median": null,
-      "overCount": 0
+      "history": [
+        {
+          "period": "2025-10",
+          "periodStart": "2025-10-01",
+          "periodEnd": "2025-10-31",
+          "spent": 72.22,
+          "limit": 90,
+          "over": false
+        },
+        {
+          "period": "2025-11",
+          "periodStart": "2025-11-01",
+          "periodEnd": "2025-11-30",
+          "spent": 74.38,
+          "limit": 90,
+          "over": false
+        },
+        {
+          "period": "2025-12",
+          "periodStart": "2025-12-01",
+          "periodEnd": "2025-12-31",
+          "spent": 78.44,
+          "limit": 90,
+          "over": false
+        },
+        {
+          "period": "2026-01",
+          "periodStart": "2026-01-01",
+          "periodEnd": "2026-01-31",
+          "spent": 98.61,
+          "limit": 90,
+          "over": true
+        },
+        {
+          "period": "2026-02",
+          "periodStart": "2026-02-01",
+          "periodEnd": "2026-02-28",
+          "spent": 102.92,
+          "limit": 90,
+          "over": true
+        },
+        {
+          "period": "2026-03",
+          "periodStart": "2026-03-01",
+          "periodEnd": "2026-03-31",
+          "spent": 91.31,
+          "limit": 90,
+          "over": true
+        },
+        {
+          "period": "2026-04",
+          "periodStart": "2026-04-01",
+          "periodEnd": "2026-04-30",
+          "spent": 66.81,
+          "limit": 90,
+          "over": false
+        },
+        {
+          "period": "2026-05",
+          "periodStart": "2026-05-01",
+          "periodEnd": "2026-05-31",
+          "spent": 81.6,
+          "limit": 90,
+          "over": false
+        },
+        {
+          "period": "2026-06",
+          "periodStart": "2026-06-01",
+          "periodEnd": "2026-06-30",
+          "spent": 97.21,
+          "limit": 90,
+          "over": true
+        },
+        {
+          "period": "2026-07",
+          "periodStart": "2026-07-01",
+          "periodEnd": "2026-07-31",
+          "spent": 87.1,
+          "limit": 90,
+          "over": false
+        },
+        {
+          "period": "2026-08",
+          "periodStart": "2026-08-01",
+          "periodEnd": "2026-08-31",
+          "spent": 72.2,
+          "limit": 90,
+          "over": false
+        }
+      ],
+      "median": 81.6,
+      "overCount": 4
     },
     {
       "id": "b1",
@@ -75,9 +342,98 @@ const FIXTURE = {
       "ratio": 1.9512088235294118,
       "overshoot": 190.24176470588236,
       "crossesOn": null,
-      "history": [],
-      "median": null,
-      "overCount": 0
+      "history": [
+        {
+          "period": "2025-10",
+          "periodStart": "2025-10-01",
+          "periodEnd": "2025-10-31",
+          "spent": 153.93,
+          "limit": 200,
+          "over": false
+        },
+        {
+          "period": "2025-11",
+          "periodStart": "2025-11-01",
+          "periodEnd": "2025-11-30",
+          "spent": 157.41,
+          "limit": 200,
+          "over": false
+        },
+        {
+          "period": "2025-12",
+          "periodStart": "2025-12-01",
+          "periodEnd": "2025-12-31",
+          "spent": 206.4,
+          "limit": 200,
+          "over": true
+        },
+        {
+          "period": "2026-01",
+          "periodStart": "2026-01-01",
+          "periodEnd": "2026-01-31",
+          "spent": 185.7,
+          "limit": 200,
+          "over": false
+        },
+        {
+          "period": "2026-02",
+          "periodStart": "2026-02-01",
+          "periodEnd": "2026-02-28",
+          "spent": 158.61,
+          "limit": 200,
+          "over": false
+        },
+        {
+          "period": "2026-03",
+          "periodStart": "2026-03-01",
+          "periodEnd": "2026-03-31",
+          "spent": 219.67,
+          "limit": 200,
+          "over": true
+        },
+        {
+          "period": "2026-04",
+          "periodStart": "2026-04-01",
+          "periodEnd": "2026-04-30",
+          "spent": 170.07,
+          "limit": 200,
+          "over": false
+        },
+        {
+          "period": "2026-05",
+          "periodStart": "2026-05-01",
+          "periodEnd": "2026-05-31",
+          "spent": 150.9,
+          "limit": 200,
+          "over": false
+        },
+        {
+          "period": "2026-06",
+          "periodStart": "2026-06-01",
+          "periodEnd": "2026-06-30",
+          "spent": 220.46,
+          "limit": 200,
+          "over": true
+        },
+        {
+          "period": "2026-07",
+          "periodStart": "2026-07-01",
+          "periodEnd": "2026-07-31",
+          "spent": 210.36,
+          "limit": 200,
+          "over": true
+        },
+        {
+          "period": "2026-08",
+          "periodStart": "2026-08-01",
+          "periodEnd": "2026-08-31",
+          "spent": 150.14,
+          "limit": 200,
+          "over": false
+        }
+      ],
+      "median": 170.07,
+      "overCount": 4
     },
     {
       "id": "b7",
@@ -113,8 +469,97 @@ const FIXTURE = {
       "ratio": 0.13322222222222221,
       "overshoot": 0,
       "crossesOn": null,
-      "history": [],
-      "median": null,
+      "history": [
+        {
+          "period": "2025-10",
+          "periodStart": "2025-10-01",
+          "periodEnd": "2025-10-31",
+          "spent": 64.91,
+          "limit": 90,
+          "over": false
+        },
+        {
+          "period": "2025-11",
+          "periodStart": "2025-11-01",
+          "periodEnd": "2025-11-30",
+          "spent": 71.44,
+          "limit": 90,
+          "over": false
+        },
+        {
+          "period": "2025-12",
+          "periodStart": "2025-12-01",
+          "periodEnd": "2025-12-31",
+          "spent": 70.29,
+          "limit": 90,
+          "over": false
+        },
+        {
+          "period": "2026-01",
+          "periodStart": "2026-01-01",
+          "periodEnd": "2026-01-31",
+          "spent": 70.75,
+          "limit": 90,
+          "over": false
+        },
+        {
+          "period": "2026-02",
+          "periodStart": "2026-02-01",
+          "periodEnd": "2026-02-28",
+          "spent": 70.68,
+          "limit": 90,
+          "over": false
+        },
+        {
+          "period": "2026-03",
+          "periodStart": "2026-03-01",
+          "periodEnd": "2026-03-31",
+          "spent": 71.17,
+          "limit": 90,
+          "over": false
+        },
+        {
+          "period": "2026-04",
+          "periodStart": "2026-04-01",
+          "periodEnd": "2026-04-30",
+          "spent": 64.43,
+          "limit": 90,
+          "over": false
+        },
+        {
+          "period": "2026-05",
+          "periodStart": "2026-05-01",
+          "periodEnd": "2026-05-31",
+          "spent": 65.61,
+          "limit": 90,
+          "over": false
+        },
+        {
+          "period": "2026-06",
+          "periodStart": "2026-06-01",
+          "periodEnd": "2026-06-30",
+          "spent": 69.63,
+          "limit": 90,
+          "over": false
+        },
+        {
+          "period": "2026-07",
+          "periodStart": "2026-07-01",
+          "periodEnd": "2026-07-31",
+          "spent": 66.24,
+          "limit": 90,
+          "over": false
+        },
+        {
+          "period": "2026-08",
+          "periodStart": "2026-08-01",
+          "periodEnd": "2026-08-31",
+          "spent": 63.23,
+          "limit": 90,
+          "over": false
+        }
+      ],
+      "median": 69.63,
       "overCount": 0
     },
     {
@@ -132,8 +577,97 @@ const FIXTURE = {
       "ratio": 0.047692307692307694,
       "overshoot": 0,
       "crossesOn": null,
-      "history": [],
-      "median": null,
+      "history": [
+        {
+          "period": "2025-10",
+          "periodStart": "2025-10-01",
+          "periodEnd": "2025-10-31",
+          "spent": 1127.44,
+          "limit": 1300,
+          "over": false
+        },
+        {
+          "period": "2025-11",
+          "periodStart": "2025-11-01",
+          "periodEnd": "2025-11-30",
+          "spent": 1113.98,
+          "limit": 1300,
+          "over": false
+        },
+        {
+          "period": "2025-12",
+          "periodStart": "2025-12-01",
+          "periodEnd": "2025-12-31",
+          "spent": 1068.84,
+          "limit": 1300,
+          "over": false
+        },
+        {
+          "period": "2026-01",
+          "periodStart": "2026-01-01",
+          "periodEnd": "2026-01-31",
+          "spent": 1043.78,
+          "limit": 1300,
+          "over": false
+        },
+        {
+          "period": "2026-02",
+          "periodStart": "2026-02-01",
+          "periodEnd": "2026-02-28",
+          "spent": 1108.75,
+          "limit": 1300,
+          "over": false
+        },
+        {
+          "period": "2026-03",
+          "periodStart": "2026-03-01",
+          "periodEnd": "2026-03-31",
+          "spent": 1092.56,
+          "limit": 1300,
+          "over": false
+        },
+        {
+          "period": "2026-04",
+          "periodStart": "2026-04-01",
+          "periodEnd": "2026-04-30",
+          "spent": 1127.14,
+          "limit": 1300,
+          "over": false
+        },
+        {
+          "period": "2026-05",
+          "periodStart": "2026-05-01",
+          "periodEnd": "2026-05-31",
+          "spent": 1092.8,
+          "limit": 1300,
+          "over": false
+        },
+        {
+          "period": "2026-06",
+          "periodStart": "2026-06-01",
+          "periodEnd": "2026-06-30",
+          "spent": 973.82,
+          "limit": 1300,
+          "over": false
+        },
+        {
+          "period": "2026-07",
+          "periodStart": "2026-07-01",
+          "periodEnd": "2026-07-31",
+          "spent": 930.66,
+          "limit": 1300,
+          "over": false
+        },
+        {
+          "period": "2026-08",
+          "periodStart": "2026-08-01",
+          "periodEnd": "2026-08-31",
+          "spent": 957.02,
+          "limit": 1300,
+          "over": false
+        }
+      ],
+      "median": 1092.56,
       "overCount": 0
     }
   ],
@@ -460,6 +994,29 @@ const FIXTURE = {
     "monthEndDate": "2026-09-30"
   },
   "ratePerDay": -23.36,
+  "split": {
+    "must": 0,
+    "need": 624.43,
+    "want": 574.71,
+    "unclassified": 84.9,
+    "total": 1284.04
+  },
+  "insights": [
+    {
+      "kind": "limit",
+      "name": "Transport",
+      "overCount": 7,
+      "periods": 11,
+      "median": 166.18,
+      "limit": 120
+    },
+    {
+      "kind": "pace",
+      "name": "Fun",
+      "projected": 319.4558823529412,
+      "median": 81.6
+    }
+  ],
   "nextMonth": {
     "start": "2026-10-01",
     "end": "2026-10-31",

@@ -236,12 +236,24 @@ text.plot-end {
 
 /* ------------------------------------------------------------------- grid */
 
+/* The runway section's height is content-dependent — the split bar and the
+   insight lines come and go with the data — so the grid claims whatever is
+   left rather than subtracting a figure that goes stale the moment a row is
+   added above it. The old `calc(100vh - 52px - 258px)` was already 80px short
+   before the split bar existed, and clipped the bottom of the side panels. */
+#dash {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
 .grid {
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr);
   gap: var(--gap);
   padding: var(--gap) 24px 24px;
-  height: calc(100vh - 52px - 258px);
+  flex: 1;
+  min-height: 0;
 }
 
 .side {
@@ -491,9 +503,11 @@ text.plot-end {
 
 @media (max-width: 1080px) {
   body { overflow: auto; height: auto; }
+  #dash { height: auto; }
   .grid {
     grid-template-columns: 1fr;
     height: auto;
+    flex: none;
   }
   .side { grid-template-rows: none; }
   .panel { overflow: visible; }

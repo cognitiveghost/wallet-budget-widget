@@ -66,6 +66,17 @@ it is marked. The line under it says when: the days are walked one at a time,
 so a budget that a rent payment tips over on the 28th says the 28th rather
 than spreading the overshoot across the month.
 
+The tick below the bar is the median of that budget's closed periods — what it
+usually does. It only appears with three or more complete periods behind it, it
+is drawn on the same scale as the limit, and it is what makes the difference
+between a loud month and a wrong limit legible in the row itself. The footer
+adds "over in 8 of 12" when that count is news.
+
+Under the balance line, the month is divided into must, need and want, from the
+cardinality Wallet already carries on each category. Anything the classification
+does not cover is drawn as its own grey segment rather than folded into the
+other three — a wide grey run means the split is not trustworthy yet.
+
 Type is Archivo, bundled in `renderer/fonts/`. Nothing is fetched at runtime.
 
 ## How the projection works
@@ -154,11 +165,12 @@ irregular spending.
   balance stays exact — the walk is anchored to the real account total — but
   the step is missing from the history, and the everyday rate never learns
   about money moved that way.
-- **Review state, not rules.** "Needs review" lists records Wallet reports as
-  `uncleared` or `waitForAssign` — imported but never confirmed. The API
-  exposes no categorisation rules, so a record a rule got wrong looks the same
-  as one it got right; only an unconfirmed record is visible.
+- **Review state, not rule outcomes.** "Needs review" lists records Wallet
+  reports as `uncleared` or `waitForAssign` — imported but never confirmed.
+  `/record-rules` does expose the categorisation rules, but knowing a rule
+  exists does not say which record it fired on, so a record a rule got wrong
+  still looks like one it got right.
 - **No server-side aggregation.** Rollups are computed locally from `/records`.
-- **Rate limit.** 300 requests/hour sustained. The default 5-minute poll uses
-  five requests per cycle before paging — roughly 60/hour — and backs off
-  automatically when the remaining budget is low.
+- **Rate limit.** 300 requests/hour sustained. The poll uses seven requests per
+  cycle before paging — roughly 84/hour at the default five minutes — and backs
+  off automatically when the remaining budget is low.

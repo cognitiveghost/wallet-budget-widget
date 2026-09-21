@@ -20,6 +20,19 @@ const pick = (xs) => xs[Math.floor(rnd() * xs.length)];
 
 const CAT = { groceries: 'c-gro', eating: 'c-eat', transport: 'c-tra', subs: 'c-sub', home: 'c-hom', fun: 'c-fun' };
 
+// Cardinality is Wallet's own must/need/want classification, set per category
+// by the user. The fixture leaves one category unset on purpose, so the
+// preview shows what an unclassified segment looks like.
+const categories = [
+  { id: CAT.groceries, name: 'Groceries', cardinality: 'need' },
+  { id: CAT.eating, name: 'Eating out', cardinality: 'want' },
+  { id: CAT.transport, name: 'Transport', cardinality: 'need' },
+  { id: CAT.subs, name: 'Subscriptions', cardinality: 'want' },
+  { id: CAT.home, name: 'Home', cardinality: 'must' },
+  { id: CAT.fun, name: 'Fun', cardinality: 'want' },
+  { id: 'c-inc', name: 'Salary', cardinality: 'none' },
+];
+
 const accounts = [
   { id: 'a1', name: 'Revolut', isBankSync: true, balance: { currentBalance: 2184.4, currencyCode: 'EUR' },
     recordStats: { recordDate: { max: iso(0) }, error: null } },
@@ -42,6 +55,15 @@ const orders = [
     generateFromDate: '2026-01-14', recurrenceRule: 'FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=14' },
   { id: 'o6', name: 'Insurance', amount: 62, type: 'expense', accountId: 'a1', categoryId: CAT.home,
     generateFromDate: '2026-01-28', recurrenceRule: 'FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=28' },
+];
+
+// One live occurrence, carried through so the preview proves the items reach
+// runway() at all. It is neither paid nor dismissed and names no record, so it
+// suppresses nothing and the line is unchanged — which is the point: the
+// plumbing is exercised without moving a fixture screenshots are reviewed
+// against. Set paidDate or dismissed here to see the suppression.
+const orderItems = [
+  { id: 'soi1', standingOrderId: 'o1', originalDate: `${day(0).slice(0, 8)}25`, paidDate: null, dismissed: false, recordIds: [] },
 ];
 
 const SHOPS = {
@@ -112,24 +134,49 @@ const spent = (categoryId, from) => records
   .reduce((sum, r) => sum - r.convertedAmount.value, 0);
 
 const monthStart = '2026-09-01';
-const budget = (id, name, categoryId, limit) => ({
-  id, name, accountIds: [], categoryIds: [categoryId], labelIds: [],
-  type: 'BUDGET_INTERVAL_MONTH', limit,
-  spending: { current: {
-    period: 'MONTH', periodStart: monthStart, periodEnd: '2026-09-30',
-    spent: Math.round(spent(categoryId, monthStart) * 100) / 100,
+
+// Twelve months of closed periods, deterministic from the seed so a screenshot
+// is reviewable against the last one. `swing` shapes the spread: a budget with
+// a wide swing gets a median well below its loud months, which is the case the
+// median tick exists to show.
+const pastPeriods = (limit, swing) => Array.from({ length: 11 }, (_, i) => {
+  const m = i - 3; // Oct 2025 … Aug 2026, stopping short of the current period
+  const s = new Date(Date.UTC(2026, m, 1));
+  const e = new Date(Date.UTC(2026, m + 1, 0));
+  const spentThen = Math.round(limit * (0.7 + swing * rnd()) * 100) / 100;
+  return {
+    period: s.toISOString().slice(0, 7),
+    periodStart: s.toISOString().slice(0, 10),
+    periodEnd: e.toISOString().slice(0, 10),
+    spent: spentThen,
     effectiveLimit: limit,
-    progress: Math.round((spent(categoryId, monthStart) / limit) * 100) / 100,
-  } },
+    progress: Math.round((spentThen / limit) * 100) / 100,
+    recordCount: 12,
+    incomplete: false,
+  };
+});
+
+const budget = (id, name, categoryId, limit, swing = 0.5) => ({
+  id, name, accountIds: [], categoryIds: [categoryId], labelIds: [],
+  type: 'BUDGET_INTERVAL_MONTH', limit, startDate: '2025-06-01',
+  spending: {
+    current: {
+      period: 'MONTH', periodStart: monthStart, periodEnd: '2026-09-30',
+      spent: Math.round(spent(categoryId, monthStart) * 100) / 100,
+      effectiveLimit: limit,
+      progress: Math.round((spent(categoryId, monthStart) / limit) * 100) / 100,
+    },
+    past: pastPeriods(limit, swing),
+  },
 });
 
 const budgets = [
   budget('b1', 'Groceries', CAT.groceries, 200), // crosses mid-month: exercises crossesOn
   budget('b2', 'Eating out', CAT.eating, 180),
-  budget('b3', 'Transport', CAT.transport, 120),
+  budget('b3', 'Transport', CAT.transport, 120, 1.4), // over most months: exercises the limit insight
   budget('b4', 'Fun', CAT.fun, 90),
-  budget('b5', 'Subscriptions', CAT.subs, 90),
-  budget('b6', 'Home', CAT.home, 1300),
+  budget('b5', 'Subscriptions', CAT.subs, 90, 0.1),   // scheduled-only: a tight median
+  budget('b6', 'Home', CAT.home, 1300, 0.2),
   // A week-long budget alongside the monthly ones, so the row that runs on its
   // own period is drawn with its own period.
   {
@@ -147,7 +194,7 @@ const uncategorized = records
   .filter((r) => r.category.id.startsWith('5c5c32'))
   .map((r) => ({ ...r }));
 
-const snapshot = build({ budgets, orders, accounts, records, uncategorized }, TODAY);
+const snapshot = build({ budgets, orders, accounts, records, uncategorized, categories, orderItems }, TODAY);
 snapshot.generatedAt = '2026-09-18T14:32:00Z';
 
 const out = path.join(__dirname, 'fixture-snapshot.js');
