@@ -62,3 +62,17 @@ test('the median tick is positioned through the CSSOM, never a style attribute',
 test('the stylesheet defines the median mark', () => {
   assert.ok(css.includes('.median'), 'style.css must carry a .median rule');
 });
+
+test('the split bar sizes its segments through the CSSOM', () => {
+  const js = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'app.js'), 'utf8');
+  assert.ok(js.includes('function renderSplit'), 'app.js must define renderSplit');
+  assert.ok(/renderSplit\(\$\('split'\)/.test(js), 'render() must call renderSplit');
+  assert.ok(/\.style\.width\s*=/.test(js), 'segment widths must be set as properties');
+});
+
+test('the split bar has a home in the markup and the stylesheet', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'index.html'), 'utf8');
+  assert.ok(html.includes('id="split"'), 'index.html must carry #split');
+  assert.ok(html.includes('id="insight"'), 'index.html must carry #insight');
+  assert.ok(css.includes('.sbar'), 'style.css must carry the bar rules');
+});

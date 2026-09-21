@@ -438,6 +438,44 @@ function renderNext(node, snapshot) {
   node.append(el('span', 'term', `on ${dayMonth(n.end)}`));
 }
 
+// What the month is made of. Four segments on one bar, because the question is
+// proportion — "is half of this month a choice?" — and four numbers in a row
+// do not answer a question about proportion.
+//
+// `unclassified` is drawn, never folded away. A wide grey run is the bar saying
+// it does not know, which is worth more than three confident segments that have
+// quietly absorbed a third of the spending.
+function renderSplit(node, snapshot) {
+  node.replaceChildren();
+  const s = snapshot.split;
+  if (!s || !(s.total > 0)) return;
+
+  const parts = [
+    ['must', 'Must', s.must],
+    ['need', 'Need', s.need],
+    ['want', 'Want', s.want],
+    ['unknown', 'Unclassified', s.unclassified],
+  ].filter(([, , v]) => v > 0);
+
+  const bar = el('div', 'sbar');
+  for (const [cls, , v] of parts) {
+    const seg = el('div', `sseg ${cls}`);
+    seg.style.width = `${(v / s.total) * 100}%`;
+    bar.append(seg);
+  }
+  node.append(bar);
+
+  const key = el('div', 'skey');
+  for (const [cls, label, v] of parts) {
+    const item = el('span', 'skey-item');
+    item.append(el('i', `dot ${cls}`));
+    item.append(el('span', null, `${label} ${Math.round((v / s.total) * 100)}%`));
+    item.append(el('span', 'skey-amt num', money0(v)));
+    key.append(item);
+  }
+  node.append(key);
+}
+
 // ----------------------------------------------------- upcoming / inbox / sync
 
 function renderUpcoming(root, snapshot) {
@@ -525,6 +563,7 @@ function render(snapshot) {
   renderRunway($('runway'), snapshot);
   renderVerdict($('verdict'), snapshot);
   renderNext($('next'), snapshot);
+  renderSplit($('split'), snapshot);
   renderBudgets($('budgets'), snapshot);
   renderUpcoming($('upcoming'), snapshot);
   renderInbox($('inbox'), $('inbox-n'), $('sync'), snapshot);

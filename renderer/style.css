@@ -185,6 +185,44 @@ text.plot-end {
 }
 .next .close.over { color: var(--signal); }
 
+/* ------------------------------------------------------- needs and wants */
+
+.split { margin: 12px 0 0; }
+
+.sbar {
+  display: flex;
+  height: 10px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--track);
+}
+.sseg { height: 100%; }
+
+/* Obligation reads as the settled colour, choice as the one that is still
+   yours to move, and what the data does not know stays the track's own grey. */
+.sseg.must, .dot.must { background: var(--measure); }
+.sseg.need, .dot.need { background: var(--promise); }
+.sseg.want, .dot.want { background: var(--signal); }
+.sseg.unknown, .dot.unknown { background: var(--rule); }
+
+.skey {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin-top: 7px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.skey-item { display: flex; align-items: center; gap: 6px; }
+.skey-amt { color: var(--paper); }
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
 /* ------------------------------------------------------------------- grid */
 
 .grid {
