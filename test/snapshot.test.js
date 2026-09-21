@@ -392,3 +392,79 @@ test('order items reach the runway and suppress a paid occurrence', () => {
 
   assert.ok(withItems.runway.end > without.runway.end, 'the dismissed rent must not be deducted');
 });
+
+// ------------------------------------------------------- must, need, want
+
+const CATS = [
+  { id: 'c-rent', name: 'Rent', cardinality: 'must' },
+  { id: 'c-gro', name: 'Groceries', cardinality: 'need' },
+  { id: 'c-fun', name: 'Fun', cardinality: 'want' },
+  { id: 'c-misc', name: 'Misc', cardinality: 'none' },
+  { id: 'c-sal', name: 'Salary', cardinality: 'none' },
+];
+
+const rec = (id, categoryId, value, date = '2026-09-10') => ({
+  id, categoryId, recordDate: date, accountId: 'a1', transfer: null,
+  category: { id: categoryId }, convertedAmount: { currencyCode: 'EUR', value },
+});
+
+// `split` is computed from the SAME account set as the balance line, so a
+// record on no included account is correctly invisible to it. The double needs
+// a real EUR account or every bucket comes back zero.
+const ACCT = [{ id: 'a1', name: 'Main', balance: { currentBalance: 0, currencyCode: 'EUR' }, recordStats: {} }];
+
+const splitOf = (records, categories = CATS) => build(
+  { budgets: [], orders: [], accounts: ACCT, records, uncategorized: [], categories },
+  '2026-09-18',
+).split;
+
+test('spending is bucketed by its category cardinality', () => {
+  const s = splitOf([rec('r1', 'c-rent', -800), rec('r2', 'c-gro', -200), rec('r3', 'c-fun', -100)]);
+  assert.strictEqual(s.must, 800);
+  assert.strictEqual(s.need, 200);
+  assert.strictEqual(s.want, 100);
+  assert.strictEqual(s.unclassified, 0);
+  assert.strictEqual(s.total, 1100);
+});
+
+test('a category with no cardinality, and one not in the list at all, fall to unclassified', () => {
+  const s = splitOf([rec('r1', 'c-misc', -50), rec('r2', 'c-nowhere', -25)]);
+  assert.strictEqual(s.unclassified, 75);
+  assert.strictEqual(s.total, 75);
+});
+
+test('income in a classified category nets its own bucket down — that is a refund', () => {
+  const s = splitOf([rec('r1', 'c-gro', -200), rec('r2', 'c-gro', 50)]);
+  assert.strictEqual(s.need, 150);
+  assert.strictEqual(s.total, 150);
+});
+
+test('income in an unclassified category is income, not a refund', () => {
+  // Salary would otherwise drive `unclassified` to -2480 and make the month
+  // read as a surplus of frugality.
+  const s = splitOf([rec('r1', 'c-fun', -100), rec('r2', 'c-sal', 2480)]);
+  assert.strictEqual(s.unclassified, 0);
+  assert.strictEqual(s.want, 100);
+  assert.strictEqual(s.total, 100);
+});
+
+test('a bucket netted past zero clamps at zero rather than going negative', () => {
+  const s = splitOf([rec('r1', 'c-gro', -50), rec('r2', 'c-gro', 200)]);
+  assert.strictEqual(s.need, 0);
+});
+
+test('transfers are excluded, as everywhere else', () => {
+  const moved = { ...rec('r1', 'c-gro', -500), transfer: 'paired' };
+  assert.strictEqual(splitOf([moved, rec('r2', 'c-gro', -100)]).need, 100);
+});
+
+test('only the current calendar month counts', () => {
+  const s = splitOf([rec('r1', 'c-gro', -100, '2026-08-20'), rec('r2', 'c-gro', -40, '2026-09-02')]);
+  assert.strictEqual(s.need, 40);
+});
+
+test('an empty category list puts everything in unclassified rather than throwing', () => {
+  const s = splitOf([rec('r1', 'c-gro', -100)], []);
+  assert.strictEqual(s.unclassified, 100);
+  assert.strictEqual(s.total, 100);
+});

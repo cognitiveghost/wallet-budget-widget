@@ -32,6 +32,50 @@ function monthBounds(todayISO, offset = 0) {
   return { start: fmt(Date.UTC(y, m, 1)), end: fmt(Date.UTC(y, m + 1, 0)) };
 }
 
+// Wallet's own classification, maintained by the user on each category.
+const KINDS = ['must', 'need', 'want'];
+
+// How this month's spending divides into things you have to pay, things you
+// need, and things you chose. `unclassified` is a visible bucket rather than a
+// silent remainder: a large grey segment means the answer is not trustworthy
+// yet, which is the honest rendering of "cardinality is unset".
+//
+// Income is handled asymmetrically, on purpose. Income landing in a CLASSIFIED
+// category is a refund and nets its own bucket down — that is what Wallet's
+// budgets do. Income landing anywhere else is income, and adding it in would
+// let a salary drive `unclassified` deeply negative and read the month as a
+// triumph of frugality.
+function splitByCardinality(records, categories, fromISO, toISO) {
+  const kindOf = new Map();
+  for (const c of categories || []) {
+    if (KINDS.includes(c.cardinality)) kindOf.set(c.id, c.cardinality);
+  }
+
+  const out = { must: 0, need: 0, want: 0, unclassified: 0, total: 0 };
+  for (const r of records || []) {
+    if (r.transfer) continue;
+    const ms = dayOf(r.recordDate);
+    if (!Number.isFinite(ms) || ms < dayOf(fromISO) || ms > dayOf(toISO)) continue;
+
+    const v = amountOf(r.convertedAmount ?? r.amount);
+    const kind = kindOf.get(r.categoryId || (r.category && r.category.id));
+    if (v > 0) {
+      if (!kind) continue;
+      out[kind] -= v;
+    } else {
+      out[kind || 'unclassified'] += -v;
+    }
+  }
+
+  // A bucket netted past zero took in more than it spent. It did not spend
+  // backwards, so it spent nothing.
+  for (const k of [...KINDS, 'unclassified']) {
+    out[k] = Math.round(Math.max(0, out[k]) * 100) / 100;
+  }
+  out.total = Math.round((out.must + out.need + out.want + out.unclassified) * 100) / 100;
+  return out;
+}
+
 function build(rawData, todayISO) {
   const {
     budgets = [], orders = [], accounts = [], records = [], uncategorized = [],
@@ -127,6 +171,9 @@ function build(rawData, todayISO) {
       };
     });
 
+  // This month only. The runway answers how much; this answers what of.
+  const split = splitByCardinality(balanceRecords, categories, start, todayISO);
+
   // The line runs to the end of next month: this month's closing balance is
   // only half an answer when rent and payday both land on the far side of it.
   const next = monthBounds(todayISO, 1);
@@ -145,6 +192,7 @@ function build(rawData, todayISO) {
     budgets: projected,
     runway: { ...line, monthEnd: balanceOn(end), monthEndDate: end },
     ratePerDay: Math.round(rate * 100) / 100,
+    split,
     nextMonth: {
       start: next.start,
       end: next.end,
@@ -186,4 +234,4 @@ function build(rawData, todayISO) {
   };
 }
 
-module.exports = { build, UNCATEGORIZED, monthBounds };
+module.exports = { build, UNCATEGORIZED, monthBounds, splitByCardinality };
