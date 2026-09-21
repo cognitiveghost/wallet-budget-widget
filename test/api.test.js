@@ -28,11 +28,14 @@ test('the bearer token is sent in the Authorization header', async () => {
   assert.strictEqual(log[0].opts.headers.Authorization, 'Bearer a.b.c');
 });
 
-test('budgets requests the precomputed spending window', async () => {
+test('budgets asks for a year of history, not two periods', async () => {
   const log = [];
   const api = createApi({ token: 'a.b.c', fetchImpl: fakeFetch({ '/budgets': { body: { budgets: [{ id: 'b' }] } } }, log) });
   const r = await api.budgets();
-  assert.ok(log[0].url.includes('spending=current%2B2') || log[0].url.includes('spending=current+2'));
+  assert.ok(
+    log[0].url.includes('spending=current%2B11') || log[0].url.includes('spending=current+11'),
+    `expected current+11, got ${log[0].url}`,
+  );
   assert.deepStrictEqual(r, [{ id: 'b' }]);
 });
 
@@ -169,4 +172,20 @@ test('the request carries an abort signal', async () => {
   });
   await api.accounts();
   assert.ok(seen && typeof seen.addEventListener === 'function');
+});
+
+test('categories unwraps its own key, not agentHints', async () => {
+  const body = { agentHints: [{ type: 'noise' }], categories: [{ id: 'c1', name: 'Groceries', cardinality: 'must' }] };
+  const api = createApi({ token: 'a.b.c', fetchImpl: fakeFetch({ '/categories': { body } }) });
+  assert.deepStrictEqual(await api.categories(), [{ id: 'c1', name: 'Groceries', cardinality: 'must' }]);
+});
+
+test('order items are asked for over the given window and unwrap standingOrderItems', async () => {
+  const log = [];
+  const body = { agentHints: [{ type: 'noise' }], standingOrderItems: [{ id: 'i1', standingOrderId: 'o1', recordIds: ['r9'] }] };
+  const api = createApi({ token: 'a.b.c', fetchImpl: fakeFetch({ '/standing-orders/items': { body } }, log) });
+  const items = await api.orderItems({ from: '2026-06-01', to: '2026-10-31' });
+  assert.deepStrictEqual(items, [{ id: 'i1', standingOrderId: 'o1', recordIds: ['r9'] }]);
+  assert.ok(log[0].url.includes('originalDate=gte.2026-06-01T00%3A00%3A00Z'), log[0].url);
+  assert.ok(log[0].url.includes('originalDate=lte.2026-10-31T23%3A59%3A59Z'), log[0].url);
 });

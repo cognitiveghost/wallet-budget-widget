@@ -76,8 +76,18 @@ function createApi({ token, fetchImpl }) {
   }
 
   return {
-    budgets: () => get('/budgets', 'budgets', { spending: 'current+2', limit: 20 }),
+    // A year of closed periods costs the same request as two. `past[]` is
+    // server-computed, so the widening buys history for nothing.
+    budgets: () => get('/budgets', 'budgets', { spending: 'current+11', limit: 20 }),
     standingOrders: () => get('/standing-orders', 'standingOrders', { limit: PAGE }),
+    // Cardinality (must/need/want) lives only on the category, never on the
+    // record, so the list has to be fetched to classify a month's spending.
+    categories: () => paged('/categories', 'categories', {}),
+    // Which occurrences have already produced records, been paid, or been
+    // dismissed. The filter takes timestamps, not bare days.
+    orderItems: ({ from, to }) => paged('/standing-orders/items', 'standingOrderItems', {
+      originalDate: [`gte.${from}T00:00:00Z`, `lte.${to}T23:59:59Z`],
+    }),
     accounts: () => get('/accounts', 'accounts', { limit: 20 }),
     records: ({ from, to, categoryId }) => paged('/records', 'records', {
       recordDate: [`gte.${from}`, `lte.${to}`],
