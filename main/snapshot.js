@@ -1,5 +1,5 @@
 const { upcoming } = require('./rrule');
-const { projectBudget, runway, amountOf, netRate } = require('./forecast');
+const { projectBudget, runway, amountOf, netRate, budgetHistory } = require('./forecast');
 
 const DAY = 86400000;
 const STALE_DAYS = 4;
@@ -38,6 +38,7 @@ function build(rawData, todayISO) {
 
   const projected = budgets.map((b) => {
     const p = projectBudget(b, orders, records, todayISO);
+    const h = budgetHistory(b);
     const cur = (b.spending && b.spending.current) || {};
     return {
       id: b.id,
@@ -47,6 +48,11 @@ function build(rawData, todayISO) {
       periodEnd: cur.periodEnd || end,
       progress: Number(cur.progress) || 0,
       ...p,
+      // What this budget usually does, so the row can say whether the number
+      // above it is news. Spread after `p`: history is not a projection term.
+      history: h.periods,
+      median: h.median,
+      overCount: h.overCount,
     };
   });
 

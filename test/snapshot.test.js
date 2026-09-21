@@ -344,3 +344,39 @@ test('the plot is handed the planned payments its projected leg is made of', () 
   assert.deepStrictEqual(planned[0].names, ['Rent', 'Broadband']);
   assert.strictEqual(planned[1].signed, 2400);
 });
+
+// ----------------------------------------------------------------- history
+
+test('each budget carries its own closed-period history onto the snapshot', () => {
+  const budgets = [{
+    id: 'b1', name: 'Transport', accountIds: [], categoryIds: ['c-tra'], labelIds: [],
+    type: 'BUDGET_INTERVAL_MONTH', limit: 120, startDate: '2025-01-01',
+    spending: {
+      current: { period: 'MONTH', periodStart: '2026-09-01', periodEnd: '2026-09-30', spent: 367, effectiveLimit: 120, progress: 3.05 },
+      past: [
+        { period: '2026-06', periodStart: '2026-06-01', periodEnd: '2026-06-30', spent: 100, effectiveLimit: 120 },
+        { period: '2026-07', periodStart: '2026-07-01', periodEnd: '2026-07-31', spent: 300, effectiveLimit: 120 },
+        { period: '2026-08', periodStart: '2026-08-01', periodEnd: '2026-08-31', spent: 200, effectiveLimit: 120 },
+      ],
+    },
+  }];
+  const s = build({ budgets, orders: [], accounts: [], records: [], uncategorized: [] }, '2026-09-18');
+  const b = s.budgets[0];
+  assert.strictEqual(b.median, 200);
+  assert.strictEqual(b.overCount, 2, '300 and 200 both beat a limit of 120');
+  assert.strictEqual(b.history.length, 3);
+  assert.strictEqual(b.history[0].periodStart, '2026-06-01', 'oldest first');
+  assert.strictEqual(b.spent, 367, 'the projection fields still survive the spread');
+});
+
+test('a budget with no past periods reports no median rather than omitting the field', () => {
+  const budgets = [{
+    id: 'b1', name: 'New', accountIds: [], categoryIds: [], labelIds: [],
+    type: 'BUDGET_INTERVAL_MONTH', limit: 50,
+    spending: { current: { periodStart: '2026-09-01', periodEnd: '2026-09-30', spent: 10, effectiveLimit: 50 } },
+  }];
+  const s = build({ budgets, orders: [], accounts: [], records: [], uncategorized: [] }, '2026-09-18');
+  assert.strictEqual(s.budgets[0].median, null);
+  assert.deepStrictEqual(s.budgets[0].history, []);
+  assert.strictEqual(s.budgets[0].overCount, 0);
+});
