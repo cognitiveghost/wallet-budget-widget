@@ -1,5 +1,13 @@
 const BASE = 'https://rest.budgetbakers.com/wallet/v1/api';
 const PAGE = 200; // the documented maximum for limit
+// `spending=current+N` asks for N closed periods alongside the running one.
+// Wallet caps N server-side and answers anything past the cap with 400 — the
+// documented parameter says nothing about a bound, and the cap is not
+// discoverable without asking. The wide window is what the median tick and the
+// "over in N of M" footer are drawn from; the narrow one is what the app ran on
+// for a year and is always accepted.
+const SPENDING_WIDE = 'current+11';
+const SPENDING_NARROW = 'current+2';
 // Without a deadline a stalled connection (proxy blackhole, TLS interception)
 // leaves the UI on "Connecting…" forever instead of reporting a failure.
 const TIMEOUT_MS = 30000;
@@ -75,10 +83,29 @@ function createApi({ token, fetchImpl }) {
     return all;
   }
 
+  // A year of closed periods costs the same request as two, so the widening
+  // buys `past[]` for nothing — but only where the server allows it. Budgets
+  // are the one call the dashboard cannot render without, and history is an
+  // enrichment on top of it, so a server that refuses the wide window gets the
+  // narrow one rather than taking the whole dashboard to the gate. Only 400 is
+  // caught: a 401 has to reach the gate as a token problem, and a 5xx is not a
+  // bad request.
+  let spendingWindow = SPENDING_WIDE;
+
+  async function budgets() {
+    try {
+      return await get('/budgets', 'budgets', { spending: spendingWindow, limit: 20 });
+    } catch (err) {
+      if (err.status !== 400 || spendingWindow === SPENDING_NARROW) throw err;
+      // Remembered, so this costs one wasted request per session, not one per
+      // poll cycle.
+      spendingWindow = SPENDING_NARROW;
+      return get('/budgets', 'budgets', { spending: spendingWindow, limit: 20 });
+    }
+  }
+
   return {
-    // A year of closed periods costs the same request as two. `past[]` is
-    // server-computed, so the widening buys history for nothing.
-    budgets: () => get('/budgets', 'budgets', { spending: 'current+11', limit: 20 }),
+    budgets,
     standingOrders: () => get('/standing-orders', 'standingOrders', { limit: PAGE }),
     // Cardinality (must/need/want) lives only on the category, never on the
     // record, so the list has to be fetched to classify a month's spending.

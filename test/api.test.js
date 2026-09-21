@@ -189,3 +189,70 @@ test('order items are asked for over the given window and unwrap standingOrderIt
   assert.ok(log[0].url.includes('originalDate=gte.2026-06-01T00%3A00%3A00Z'), log[0].url);
   assert.ok(log[0].url.includes('originalDate=lte.2026-10-31T23%3A59%3A59Z'), log[0].url);
 });
+
+// A 400 on the widened spending window took the whole dashboard to the gate
+// with "request failed (400)": the token was fine, the request shape was not.
+// The wide window is an enrichment — it buys `past[]` for the history marks —
+// and an enrichment must never be able to fail the one call the dashboard
+// cannot render without.
+function sequenceFetch(responses, log = []) {
+  let i = 0;
+  return async (url, opts) => {
+    log.push({ url, opts });
+    const spec = responses[Math.min(i += 1, responses.length) - 1];
+    return {
+      ok: spec.status === undefined || spec.status < 400,
+      status: spec.status ?? 200,
+      headers: new Map(),
+      json: async () => spec.body,
+      text: async () => JSON.stringify(spec.body),
+    };
+  };
+}
+
+test('a 400 on the wide spending window falls back to the narrow one', async () => {
+  const log = [];
+  const api = createApi({
+    token: 'a.b.c',
+    fetchImpl: sequenceFetch([{ status: 400, body: {} }, { body: { budgets: [{ id: 'b' }] } }], log),
+  });
+  assert.deepStrictEqual(await api.budgets(), [{ id: 'b' }]);
+  assert.strictEqual(log.length, 2, 'it must retry exactly once');
+  assert.ok(log[0].url.includes('current%2B11') || log[0].url.includes('current+11'), log[0].url);
+  assert.ok(log[1].url.includes('current%2B2') || log[1].url.includes('current+2'), log[1].url);
+});
+
+test('a rejected token is never retried — 401 has to reach the gate as 401', async () => {
+  const log = [];
+  const api = createApi({
+    token: 'a.b.c',
+    fetchImpl: sequenceFetch([{ status: 401, body: {} }, { body: { budgets: [{ id: 'b' }] } }], log),
+  });
+  await assert.rejects(() => api.budgets(), (e) => e.status === 401 && e.message === 'unauthorized');
+  assert.strictEqual(log.length, 1, 'a 401 must not burn a second request');
+});
+
+test('a server error is not retried either — a 500 is not a bad request', async () => {
+  const log = [];
+  const api = createApi({
+    token: 'a.b.c',
+    fetchImpl: sequenceFetch([{ status: 500, body: {} }, { body: { budgets: [] } }], log),
+  });
+  await assert.rejects(() => api.budgets(), (e) => e.status === 500);
+  assert.strictEqual(log.length, 1);
+});
+
+test('the fallback fires once, not on every later call', async () => {
+  const log = [];
+  const api = createApi({
+    token: 'a.b.c',
+    fetchImpl: sequenceFetch([{ status: 400, body: {} }, { body: { budgets: [{ id: 'b' }] } }], log),
+  });
+  await api.budgets();
+  await api.budgets();
+  assert.deepStrictEqual(
+    log.slice(2).map((c) => (c.url.includes('current%2B2') ? 'narrow' : 'wide')),
+    ['narrow'],
+    'once the server has said no, stop asking for the wide window',
+  );
+});
