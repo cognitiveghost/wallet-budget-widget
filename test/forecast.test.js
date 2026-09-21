@@ -473,3 +473,65 @@ test('a zero limit is never over — an unlimited budget cannot overspend', () =
   assert.strictEqual(h.overCount, 0);
   assert.strictEqual(h.median, 200);
 });
+
+// ---------------------------------------------------------- settled orders
+
+const { runway } = require('../main/forecast');
+
+// One order, due on the 25th, and a hand-entered record for the same payment.
+const salary = { id: 'o1', name: 'Salary', amount: 1000, type: 'income', accountId: 'a1',
+  generateFromDate: '2026-01-25', recurrenceRule: 'FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=25' };
+const handEntered = { id: 'r1', recordDate: '2026-09-25', accountId: 'a1',
+  convertedAmount: { currencyCode: 'EUR', value: 1000 }, counterParty: 'Salary', transfer: null };
+
+test('without items, an order and its hand-entered record are both booked — the known double-count', () => {
+  const line = runway([handEntered], [salary], 0, '2026-09-01', '2026-09-30', '2026-09-18', 0);
+  assert.strictEqual(line.end, 2000, 'this is the bug the items fix');
+});
+
+test('a record named by an item recordIds is booked by the order, not twice', () => {
+  const items = [{ id: 'i1', standingOrderId: 'o1', originalDate: '2026-09-25', recordIds: ['r1'] }];
+  const line = runway([handEntered], [salary], 0, '2026-09-01', '2026-09-30', '2026-09-18', 0, items);
+  assert.strictEqual(line.end, 1000);
+});
+
+test('a dismissed occurrence does not book at all', () => {
+  const items = [{ id: 'i1', standingOrderId: 'o1', originalDate: '2026-09-25', dismissed: true, recordIds: [] }];
+  const line = runway([], [salary], 0, '2026-09-01', '2026-09-30', '2026-09-18', 0, items);
+  assert.strictEqual(line.end, 0);
+  assert.deepStrictEqual(line.planned, [], 'and it is not offered to the plot either');
+});
+
+test('a paid occurrence does not book again', () => {
+  const items = [{ id: 'i1', standingOrderId: 'o1', originalDate: '2026-09-25', paidDate: '2026-09-25T09:00:00Z', recordIds: [] }];
+  const line = runway([], [salary], 0, '2026-09-01', '2026-09-30', '2026-09-18', 0, items);
+  assert.strictEqual(line.end, 0);
+});
+
+test('an item aligned to a different day than the rule still suppresses its occurrence', () => {
+  // The 25th fell on a weekend and the bank moved it; the RRULE still expands
+  // to the 25th, so both dates have to key the suppression.
+  const items = [{ id: 'i1', standingOrderId: 'o1', originalDate: '2026-09-25', alignedDate: '2026-09-27', dismissed: true }];
+  const line = runway([], [salary], 0, '2026-09-01', '2026-09-30', '2026-09-18', 0, items);
+  assert.strictEqual(line.end, 0);
+});
+
+test('an item for a different order suppresses nothing', () => {
+  const items = [{ id: 'i1', standingOrderId: 'o-other', originalDate: '2026-09-25', dismissed: true }];
+  const line = runway([], [salary], 0, '2026-09-01', '2026-09-30', '2026-09-18', 0, items);
+  assert.strictEqual(line.end, 1000);
+});
+
+test('an empty item list leaves the line identical to no argument at all', () => {
+  const a = runway([handEntered], [salary], 0, '2026-09-01', '2026-09-30', '2026-09-18', 0);
+  const b = runway([handEntered], [salary], 0, '2026-09-01', '2026-09-30', '2026-09-18', 0, []);
+  assert.deepStrictEqual(a, b);
+});
+
+test('items never suppress the measured leg — a past record still moved the balance', () => {
+  const past = { id: 'r2', recordDate: '2026-09-05', accountId: 'a1',
+    convertedAmount: { currencyCode: 'EUR', value: -50 }, counterParty: 'Gym', transfer: null };
+  const items = [{ id: 'i2', standingOrderId: 'o2', originalDate: '2026-09-05', recordIds: ['r2'] }];
+  const line = runway([past], [], 0, '2026-09-01', '2026-09-30', '2026-09-18', 0, items);
+  assert.strictEqual(line.actual[line.actual.length - 1].balance, -50, 'history is history');
+});

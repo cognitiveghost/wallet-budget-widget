@@ -242,6 +242,30 @@ function projectBudget(budget, orders, records, todayISO) {
   };
 }
 
+// Which future payments the standing-order items say are already dealt with.
+//
+// Items materialise for occurrences Wallet has already reached, so this can
+// only ever SUPPRESS — it never generates an occurrence the RRULE did not
+// produce. If the endpoint fails or returns nothing, the line is exactly what
+// it was before items existed.
+//
+// Both dates key the occurrence set: the RRULE expands to originalDate, but a
+// payment the bank moved reports an alignedDate, and either may be the one the
+// item carries.
+function settledBy(items) {
+  const records = new Set();
+  const occurrences = new Set();
+  for (const it of items || []) {
+    for (const id of it.recordIds || []) records.add(id);
+    if (it.dismissed || it.paidDate) {
+      for (const d of [it.originalDate, it.alignedDate]) {
+        if (d) occurrences.add(`${it.standingOrderId}|${String(d).slice(0, 10)}`);
+      }
+    }
+  }
+  return { records, occurrences };
+}
+
 // Daily balance series: measured up to today, arithmetic from today to the
 // horizon. startBalance is the balance as of periodStartISO.
 //
@@ -250,10 +274,11 @@ function projectBudget(budget, orders, records, todayISO) {
 // case, positive is an account that takes in more off-schedule than it spends.
 // Without it the projection only books money it knows the date of, so the line
 // drifts and the further the horizon runs the more it lies.
-function runway(records, orders, startBalance, periodStartISO, periodEndISO, todayISO, ratePerDay = 0) {
+function runway(records, orders, startBalance, periodStartISO, periodEndISO, todayISO, ratePerDay = 0, items = []) {
   const start = dayOf(periodStartISO);
   const end = dayOf(periodEndISO);
   const today = Math.min(dayOf(todayISO), end);
+  const settled = settledBy(items);
 
   const perDay = new Map();
   for (const r of records || []) {
@@ -281,18 +306,23 @@ function runway(records, orders, startBalance, periodStartISO, periodEndISO, tod
     if (name) slot.names.push(name);
     events.set(date, slot);
   };
-  for (const e of upcoming(orders, fmt(today + DAY), periodEndISO)) add(e.date, e.signed, e.name);
+  for (const e of upcoming(orders, fmt(today + DAY), periodEndISO)) {
+    // Already paid, or the user dismissed it. Booking it again drops the
+    // balance for a payment that has already happened.
+    if (settled.occurrences.has(`${e.orderId}|${e.date}`)) continue;
+    add(e.date, e.signed, e.name);
+  }
 
   // A record dated ahead of today is one somebody entered by hand. Card
   // payments reach Wallet through bank sync only after they have happened, so
   // nothing arriving from the sync is ever in the future — a future record is
   // a cash payment the user already knows is coming, and it belongs on the
   // line. These used to be dropped: the money simply never appeared.
-  // ponytail: a hand-entered record that ALSO has a standing order behind it
-  // is counted twice. The payload gives nothing to tell the two apart; drop
-  // this if it ever bites.
   for (const r of records || []) {
     if (r.transfer) continue;
+    // A record a standing-order item claims is that order's payment. The
+    // occurrence books it; booking the record too spends the money twice.
+    if (settled.records.has(r.id)) continue;
     const ms = dayOf(r.recordDate);
     if (!Number.isFinite(ms) || ms <= today || ms > end) continue;
     add(fmt(ms), signedOf(r), r.counterParty || 'Entered by hand');
