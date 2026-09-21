@@ -50,3 +50,15 @@ test('the preview harness carries every element the renderer looks up', () => {
     assert.match(preview, new RegExp(`id="${id}"`), `preview.html has no #${id}`);
   }
 });
+
+test('the median tick is positioned through the CSSOM, never a style attribute', () => {
+  // The track's marks all scale through at(); the median must use the same one
+  // or it lands on a different scale from the limit it is read against.
+  const js = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'app.js'), 'utf8');
+  assert.ok(js.includes("el('div', 'median')"), 'renderBudgets must build a .median element');
+  assert.ok(/median.*\.style\.left\s*=/s.test(js), 'the tick must be placed via style.left');
+});
+
+test('the stylesheet defines the median mark', () => {
+  assert.ok(css.includes('.median'), 'style.css must carry a .median rule');
+});

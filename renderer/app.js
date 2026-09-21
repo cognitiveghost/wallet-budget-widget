@@ -101,6 +101,17 @@ function renderBudgets(root, snapshot) {
     // The bar stops where the projection lands, so the graduation is the only
     // mark needed: a bar that crosses it is a budget that ends over.
     if (b.limit > 0) track.append(el('div', `limit${over ? ' crossed' : ''}`));
+
+    // Where this budget usually lands, on the same scale as everything else in
+    // the row. A projection past the limit is only news if it is also past
+    // this: €367 against a €240 usual month is a loud month, €367 against a
+    // €360 usual month is a wrong limit.
+    if (typeof b.median === 'number') {
+      const tick = el('div', 'median');
+      tick.style.left = `${at(b.median)}%`;
+      track.append(tick);
+    }
+
     if (over) {
       const spill = el('div', 'spill');
       spill.style.left = `${LIMIT_STOP}%`;
@@ -118,6 +129,11 @@ function renderBudgets(root, snapshot) {
     else if (over && b.crossesOn) verdict = `Over on ${dayMonth(b.crossesOn)}, by ${money0(b.overshoot)}`;
     else if (over) verdict = `Lands at ${money0(b.projected)}, ${money0(b.overshoot)} over`;
     foot.append(el('span', `lands${over ? ' over' : ''} num`, verdict));
+
+    // Only when it is news. "Over in 0 of 12" is a sentence nobody needs.
+    if (b.overCount > 0 && b.history && b.history.length >= 3) {
+      foot.append(el('span', 'usual num', `over in ${b.overCount} of ${b.history.length}`));
+    }
 
     // The three terms the projection is made of, shown rather than hidden in a
     // tooltip — a budget of pure subscriptions and a budget of pure burn rate

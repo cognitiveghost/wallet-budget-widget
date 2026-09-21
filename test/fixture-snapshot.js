@@ -17,7 +17,10 @@ const FIXTURE = {
       "limit": 120,
       "ratio": 5.222274509803922,
       "overshoot": 506.67294117647066,
-      "crossesOn": null
+      "crossesOn": null,
+      "history": [],
+      "median": null,
+      "overCount": 0
     },
     {
       "id": "b2",
@@ -33,7 +36,10 @@ const FIXTURE = {
       "limit": 180,
       "ratio": 3.242823529411765,
       "overshoot": 403.7082352941177,
-      "crossesOn": null
+      "crossesOn": null,
+      "history": [],
+      "median": null,
+      "overCount": 0
     },
     {
       "id": "b4",
@@ -49,7 +55,10 @@ const FIXTURE = {
       "limit": 90,
       "ratio": 3.549509803921569,
       "overshoot": 229.45588235294122,
-      "crossesOn": null
+      "crossesOn": null,
+      "history": [],
+      "median": null,
+      "overCount": 0
     },
     {
       "id": "b1",
@@ -65,7 +74,10 @@ const FIXTURE = {
       "limit": 200,
       "ratio": 1.9512088235294118,
       "overshoot": 190.24176470588236,
-      "crossesOn": null
+      "crossesOn": null,
+      "history": [],
+      "median": null,
+      "overCount": 0
     },
     {
       "id": "b7",
@@ -81,7 +93,10 @@ const FIXTURE = {
       "limit": 150,
       "ratio": 0.5045666666666667,
       "overshoot": 0,
-      "crossesOn": null
+      "crossesOn": null,
+      "history": [],
+      "median": null,
+      "overCount": 0
     },
     {
       "id": "b5",
@@ -97,7 +112,10 @@ const FIXTURE = {
       "limit": 90,
       "ratio": 0.13322222222222221,
       "overshoot": 0,
-      "crossesOn": null
+      "crossesOn": null,
+      "history": [],
+      "median": null,
+      "overCount": 0
     },
     {
       "id": "b6",
@@ -113,7 +131,10 @@ const FIXTURE = {
       "limit": 1300,
       "ratio": 0.047692307692307694,
       "overshoot": 0,
-      "crossesOn": null
+      "crossesOn": null,
+      "history": [],
+      "median": null,
+      "overCount": 0
     }
   ],
   "runway": {

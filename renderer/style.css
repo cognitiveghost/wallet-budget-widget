@@ -303,6 +303,28 @@ text.plot-end {
 .limit.crossed { background: var(--signal); }
 .limit.crossed::before { background: var(--signal); }
 
+/* The usual month, drawn on the same scale as the limit it is read against.
+   It caps from BELOW where the graduation caps from above, so the two read as
+   two marks on one scale rather than as two competing gaps in the bar, and it
+   stays in the quiet colour: the limit is the loud mark. */
+.median {
+  position: absolute;
+  z-index: 1;
+  top: 3px;
+  bottom: -6px;
+  width: 1px;
+  background: var(--muted);
+}
+.median::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: -2px;
+  width: 5px;
+  height: 2px;
+  background: var(--muted);
+}
+
 /* The overshoot is exactly the run of bar past the graduation, so that run is
    what gets marked — the segment colours underneath still say which of the
    three terms pushed it there. */
@@ -327,6 +349,7 @@ text.plot-end {
 .bfoot i { font-style: normal; }
 .bfoot .k-spent { color: var(--measure); }
 .bfoot .k-due { color: var(--promise); }
+.bfoot .usual { color: var(--muted); }
 
 @media (prefers-reduced-motion: no-preference) {
   .seg { animation: reveal .45s cubic-bezier(.22, 1, .36, 1) both; }
