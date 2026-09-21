@@ -1,12 +1,16 @@
 const BASE = 'https://rest.budgetbakers.com/wallet/v1/api';
 const PAGE = 200; // the documented maximum for limit
-// `spending=current+N` asks for N closed periods alongside the running one.
-// Wallet caps N server-side and answers anything past the cap with 400 — the
-// documented parameter says nothing about a bound, and the cap is not
-// discoverable without asking. The wide window is what the median tick and the
-// "over in N of M" footer are drawn from; the narrow one is what the app ran on
-// for a year and is always accepted.
-const SPENDING_WIDE = 'current+11';
+// `spending` is an ENUM, not a number with a ceiling. Probed against the live
+// API, which names the set in its own 400 body:
+//
+//   none, current, current+2, current+5, current+10, current+25
+//
+// So current+11 was not "too many", it was simply not a member — current+3, +4,
+// +6…+9 and +12 are refused for the same reason. current+10 is the closest
+// allowed value to the year of history the median tick wants; current+25 exists
+// but reaches back far enough that a "usual month" stops describing the present.
+// The narrow value is what the app ran on for a year and is always accepted.
+const SPENDING_WIDE = 'current+10';
 const SPENDING_NARROW = 'current+2';
 // Without a deadline a stalled connection (proxy blackhole, TLS interception)
 // leaves the UI on "Connecting…" forever instead of reporting a failure.
@@ -111,8 +115,10 @@ function createApi({ token, fetchImpl }) {
     // record, so the list has to be fetched to classify a month's spending.
     categories: () => paged('/categories', 'categories', {}),
     // Which occurrences have already produced records, been paid, or been
-    // dismissed. The filter takes timestamps, not bare days.
-    orderItems: ({ from, to }) => paged('/standing-orders/items', 'standingOrderItems', {
+    // dismissed. The filter takes timestamps, not bare days, and the envelope
+    // key is `items` — not `standingOrderItems`, which is what every other
+    // collection's key would suggest.
+    orderItems: ({ from, to }) => paged('/standing-orders/items', 'items', {
       originalDate: [`gte.${from}T00:00:00Z`, `lte.${to}T23:59:59Z`],
     }),
     accounts: () => get('/accounts', 'accounts', { limit: 20 }),

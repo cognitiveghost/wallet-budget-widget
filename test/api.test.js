@@ -28,13 +28,13 @@ test('the bearer token is sent in the Authorization header', async () => {
   assert.strictEqual(log[0].opts.headers.Authorization, 'Bearer a.b.c');
 });
 
-test('budgets asks for a year of history, not two periods', async () => {
+test('budgets asks for the widest allowed history window, not two periods', async () => {
   const log = [];
   const api = createApi({ token: 'a.b.c', fetchImpl: fakeFetch({ '/budgets': { body: { budgets: [{ id: 'b' }] } } }, log) });
   const r = await api.budgets();
   assert.ok(
-    log[0].url.includes('spending=current%2B11') || log[0].url.includes('spending=current+11'),
-    `expected current+11, got ${log[0].url}`,
+    log[0].url.includes('spending=current%2B10') || log[0].url.includes('spending=current+10'),
+    `expected current+10, got ${log[0].url}`,
   );
   assert.deepStrictEqual(r, [{ id: 'b' }]);
 });
@@ -180,9 +180,20 @@ test('categories unwraps its own key, not agentHints', async () => {
   assert.deepStrictEqual(await api.categories(), [{ id: 'c1', name: 'Groceries', cardinality: 'must' }]);
 });
 
-test('order items are asked for over the given window and unwrap standingOrderItems', async () => {
+// The live endpoint answers {items, limit, offset} — NOT {standingOrderItems}.
+// Asking for the wrong key still worked, by falling through listOf's
+// unknown-envelope branch to "first array that is not agentHints", so the
+// original test passed while encoding an envelope the API never sends. The
+// decoy array is what pins it: take `items` by name, not by position.
+test('order items are asked for over the given window and unwrap items by name', async () => {
   const log = [];
-  const body = { agentHints: [{ type: 'noise' }], standingOrderItems: [{ id: 'i1', standingOrderId: 'o1', recordIds: ['r9'] }] };
+  const body = {
+    agentHints: [{ type: 'noise' }],
+    somethingElse: [{ id: 'decoy' }],
+    items: [{ id: 'i1', standingOrderId: 'o1', recordIds: ['r9'] }],
+    limit: 200,
+    offset: 0,
+  };
   const api = createApi({ token: 'a.b.c', fetchImpl: fakeFetch({ '/standing-orders/items': { body } }, log) });
   const items = await api.orderItems({ from: '2026-06-01', to: '2026-10-31' });
   assert.deepStrictEqual(items, [{ id: 'i1', standingOrderId: 'o1', recordIds: ['r9'] }]);
@@ -218,7 +229,7 @@ test('a 400 on the wide spending window falls back to the narrow one', async () 
   });
   assert.deepStrictEqual(await api.budgets(), [{ id: 'b' }]);
   assert.strictEqual(log.length, 2, 'it must retry exactly once');
-  assert.ok(log[0].url.includes('current%2B11') || log[0].url.includes('current+11'), log[0].url);
+  assert.ok(log[0].url.includes('current%2B10') || log[0].url.includes('current+10'), log[0].url);
   assert.ok(log[1].url.includes('current%2B2') || log[1].url.includes('current+2'), log[1].url);
 });
 

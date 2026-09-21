@@ -67,7 +67,11 @@ so a budget that a rent payment tips over on the 28th says the 28th rather
 than spreading the overshoot across the month.
 
 The tick below the bar is the median of that budget's closed periods — what it
-usually does. It only appears with three or more complete periods behind it, it
+usually does. `spending` is an enum, not a count: `none`, `current`,
+`current+2`, `current+5`, `current+10`, `current+25`, and anything else is a
+400, so the app asks for `current+10` and falls back to `current+2` if a server
+ever refuses. The tick only appears with three or more complete periods behind
+it, it
 is drawn on the same scale as the limit, and it is what makes the difference
 between a loud month and a wrong limit legible in the row itself. The footer
 adds "over in 8 of 12" when that count is news.
@@ -171,6 +175,7 @@ irregular spending.
   exists does not say which record it fired on, so a record a rule got wrong
   still looks like one it got right.
 - **No server-side aggregation.** Rollups are computed locally from `/records`.
-- **Rate limit.** 300 requests/hour sustained. The poll uses seven requests per
-  cycle before paging — roughly 84/hour at the default five minutes — and backs
-  off automatically when the remaining budget is low.
+- **Rate limit.** `x-ratelimit-limit-hour` reports 450/hour on a Premium
+  account. The poll uses seven requests per cycle before paging — roughly
+  84/hour at the default five minutes — and backs off automatically when the
+  remaining budget is low.
