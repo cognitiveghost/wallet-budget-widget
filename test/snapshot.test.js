@@ -433,10 +433,26 @@ test('a category with no cardinality, and one not in the list at all, fall to un
   assert.strictEqual(s.total, 75);
 });
 
-test('income in a classified category nets its own bucket down — that is a refund', () => {
+// Netting income into a spending bucket was the original design: income in a
+// classified category was read as a refund. Against the live account that
+// erased a whole bucket — 11 `want` purchases worth EUR112.71 were wiped by
+// EUR1138.82 of income, EUR926.61 of it a single incoming company transfer
+// filed under a want category. A refund and a mis-filed transfer are not
+// distinguishable without guessing record by record, so neither is netted.
+test('a refund does not net its bucket down — the bar counts what went out', () => {
   const s = splitOf([rec('r1', 'c-gro', -200), rec('r2', 'c-gro', 50)]);
-  assert.strictEqual(s.need, 150);
-  assert.strictEqual(s.total, 150);
+  assert.strictEqual(s.need, 200);
+  assert.strictEqual(s.total, 200);
+});
+
+test('income far exceeding a bucket cannot erase what was spent from it', () => {
+  // The live shape: small real spending, one large incoming transfer.
+  const s = splitOf([
+    rec('r1', 'c-fun', -12.71), rec('r2', 'c-fun', -100),
+    rec('r3', 'c-fun', 926.61), rec('r4', 'c-fun', 49.95),
+  ]);
+  assert.strictEqual(s.want, 112.71, 'eleven real purchases must not vanish');
+  assert.strictEqual(s.total, 112.71);
 });
 
 test('income in an unclassified category is income, not a refund', () => {
@@ -448,9 +464,9 @@ test('income in an unclassified category is income, not a refund', () => {
   assert.strictEqual(s.total, 100);
 });
 
-test('a bucket netted past zero clamps at zero rather than going negative', () => {
+test('a bucket is never negative — income is not negative spending', () => {
   const s = splitOf([rec('r1', 'c-gro', -50), rec('r2', 'c-gro', 200)]);
-  assert.strictEqual(s.need, 0);
+  assert.strictEqual(s.need, 50);
 });
 
 test('transfers are excluded, as everywhere else', () => {

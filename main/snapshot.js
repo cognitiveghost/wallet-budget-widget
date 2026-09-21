@@ -40,11 +40,17 @@ const KINDS = ['must', 'need', 'want'];
 // silent remainder: a large grey segment means the answer is not trustworthy
 // yet, which is the honest rendering of "cardinality is unset".
 //
-// Income is handled asymmetrically, on purpose. Income landing in a CLASSIFIED
-// category is a refund and nets its own bucket down — that is what Wallet's
-// budgets do. Income landing anywhere else is income, and adding it in would
-// let a salary drive `unclassified` deeply negative and read the month as a
-// triumph of frugality.
+// Money OUT only. Income is skipped wherever it lands.
+//
+// Netting income into its own bucket as a refund was the first design, and it
+// is wrong in the only way that matters: a refund and an incoming transfer
+// that happens to carry a spending category are the same shape in the payload.
+// Against a real account one EUR926 company transfer filed under a `want`
+// category drove that bucket to -1026 and the clamp turned it into a confident
+// zero, hiding eleven genuine purchases. Telling the two apart needs a
+// record-by-record guess, and a wrong guess silently deletes a bucket; not
+// netting at most overstates one by the size of a real refund. The bar answers
+// "what did this month go on", and a refund is not negative spending.
 function splitByCardinality(records, categories, fromISO, toISO) {
   const kindOf = new Map();
   for (const c of categories || []) {
@@ -58,19 +64,13 @@ function splitByCardinality(records, categories, fromISO, toISO) {
     if (!Number.isFinite(ms) || ms < dayOf(fromISO) || ms > dayOf(toISO)) continue;
 
     const v = amountOf(r.convertedAmount ?? r.amount);
+    if (v >= 0) continue;
     const kind = kindOf.get(r.categoryId || (r.category && r.category.id));
-    if (v > 0) {
-      if (!kind) continue;
-      out[kind] -= v;
-    } else {
-      out[kind || 'unclassified'] += -v;
-    }
+    out[kind || 'unclassified'] += -v;
   }
 
-  // A bucket netted past zero took in more than it spent. It did not spend
-  // backwards, so it spent nothing.
   for (const k of [...KINDS, 'unclassified']) {
-    out[k] = Math.round(Math.max(0, out[k]) * 100) / 100;
+    out[k] = Math.round(out[k] * 100) / 100;
   }
   out.total = Math.round((out.must + out.need + out.want + out.unclassified) * 100) / 100;
   return out;

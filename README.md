@@ -81,6 +81,13 @@ cardinality Wallet already carries on each category. Anything the classification
 does not cover is drawn as its own grey segment rather than folded into the
 other three — a wide grey run means the split is not trustworthy yet.
 
+The bar counts money out and skips income entirely, including income that lands
+in a spending category. Netting it down as a refund reads well until an
+incoming transfer is filed under a spending category: one of those is enough to
+drive a bucket negative and render it as a confident zero, hiding every real
+purchase in it. A refund and a mis-filed transfer are the same shape in the
+payload, so neither is netted.
+
 Type is Archivo, bundled in `renderer/fonts/`. Nothing is fetched at runtime.
 
 ## How the projection works
