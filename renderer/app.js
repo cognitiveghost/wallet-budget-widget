@@ -476,6 +476,28 @@ function renderSplit(node, snapshot) {
   node.append(key);
 }
 
+// The sentence the numbers above cannot say on their own: whether this month
+// is news. Two at most, and nothing at all when there is not enough history —
+// an empty line beats a confident one drawn from two months.
+function renderInsight(node, snapshot) {
+  node.replaceChildren();
+  for (const i of snapshot.insights || []) {
+    const line = el('span', 'insight-line');
+    if (i.kind === 'limit') {
+      line.append(el('b', null, i.name));
+      line.append(document.createTextNode(
+        ` has ended over in ${i.overCount} of the last ${i.periods}. The usual month is ${money0(i.median)}, the limit is ${money0(i.limit)}.`,
+      ));
+    } else {
+      line.append(el('b', null, i.name));
+      line.append(document.createTextNode(
+        ` projects ${money0(i.projected)}, ${Math.round((i.projected / i.median - 1) * 100)}% above its usual ${money0(i.median)}.`,
+      ));
+    }
+    node.append(line);
+  }
+}
+
 // ----------------------------------------------------- upcoming / inbox / sync
 
 function renderUpcoming(root, snapshot) {
@@ -564,6 +586,7 @@ function render(snapshot) {
   renderVerdict($('verdict'), snapshot);
   renderNext($('next'), snapshot);
   renderSplit($('split'), snapshot);
+  renderInsight($('insight'), snapshot);
   renderBudgets($('budgets'), snapshot);
   renderUpcoming($('upcoming'), snapshot);
   renderInbox($('inbox'), $('inbox-n'), $('sync'), snapshot);

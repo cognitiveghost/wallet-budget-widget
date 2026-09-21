@@ -76,6 +76,42 @@ function splitByCardinality(records, categories, fromISO, toISO) {
   return out;
 }
 
+const LOUD = 1.4;        // how far past the usual month counts as a loud month
+const MAX_INSIGHTS = 2;  // a list of eight insights is a list nobody reads
+
+// Two sentences at most, from history the budgets already carry.
+//
+// A wrong limit outranks a loud month because it is a thing you fix once,
+// where a loud month is a thing you watch. Within a rule, the worst offender
+// wins. A budget with no median says nothing: silence is the correct output
+// for two months of history.
+//
+// Structured, not prose — the snapshot has no locale and no currency
+// formatter. The renderer writes the sentence.
+function insightsFrom(budgets) {
+  const usable = (budgets || []).filter((x) => typeof x.median === 'number' && (x.history || []).length >= 3);
+
+  const wrongLimit = usable
+    .filter((x) => x.overCount > 0 && x.overCount * 2 >= x.history.length)
+    .sort((a, z) => (z.overCount / z.history.length) - (a.overCount / a.history.length) || z.overCount - a.overCount)
+    .map((x) => ({
+      kind: 'limit',
+      name: x.name,
+      overCount: x.overCount,
+      periods: x.history.length,
+      median: x.median,
+      limit: x.limit,
+    }));
+
+  const named = new Set(wrongLimit.map((x) => x.name));
+  const loudMonth = usable
+    .filter((x) => !named.has(x.name) && x.median > 0 && x.projected > x.median * LOUD)
+    .sort((a, z) => (z.projected / z.median) - (a.projected / a.median))
+    .map((x) => ({ kind: 'pace', name: x.name, projected: x.projected, median: x.median }));
+
+  return [...wrongLimit, ...loudMonth].slice(0, MAX_INSIGHTS);
+}
+
 function build(rawData, todayISO) {
   const {
     budgets = [], orders = [], accounts = [], records = [], uncategorized = [],
@@ -105,6 +141,8 @@ function build(rawData, todayISO) {
 
   // Worst news first — whatever is about to go wrong rises to the top.
   projected.sort((a, b) => (b.overshoot - a.overshoot) || (b.ratio - a.ratio));
+
+  const insights = insightsFrom(projected);
 
   // The runway is one line of money, so its balances and its records have to
   // come from the same set of accounts. Archived and excluded-from-stats
@@ -193,6 +231,7 @@ function build(rawData, todayISO) {
     runway: { ...line, monthEnd: balanceOn(end), monthEndDate: end },
     ratePerDay: Math.round(rate * 100) / 100,
     split,
+    insights,
     nextMonth: {
       start: next.start,
       end: next.end,
@@ -234,4 +273,4 @@ function build(rawData, todayISO) {
   };
 }
 
-module.exports = { build, UNCATEGORIZED, monthBounds, splitByCardinality };
+module.exports = { build, UNCATEGORIZED, monthBounds, splitByCardinality, insightsFrom };

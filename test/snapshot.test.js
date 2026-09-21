@@ -468,3 +468,65 @@ test('an empty category list puts everything in unclassified rather than throwin
   assert.strictEqual(s.unclassified, 100);
   assert.strictEqual(s.total, 100);
 });
+
+// ---------------------------------------------------------------- insights
+
+const { insightsFrom } = require('../main/snapshot');
+
+const b = (name, over) => ({
+  name, limit: 120, projected: 200, median: 100, overCount: over,
+  history: Array.from({ length: 12 }, (_, i) => ({ periodStart: `2026-${String(i + 1).padStart(2, '0')}-01` })),
+});
+
+test('a budget over in half its periods is reported as a wrong limit', () => {
+  const [i] = insightsFrom([b('Transport', 8)]);
+  assert.strictEqual(i.kind, 'limit');
+  assert.strictEqual(i.name, 'Transport');
+  assert.strictEqual(i.overCount, 8);
+  assert.strictEqual(i.periods, 12);
+  assert.strictEqual(i.median, 100);
+  assert.strictEqual(i.limit, 120);
+});
+
+test('a loud month is reported when the limit is not the problem', () => {
+  const [i] = insightsFrom([{ ...b('Eating out', 1), projected: 368, median: 240 }]);
+  assert.strictEqual(i.kind, 'pace');
+  assert.strictEqual(i.projected, 368);
+  assert.strictEqual(i.median, 240);
+});
+
+test('a wrong limit outranks a loud month', () => {
+  const out = insightsFrom([
+    { ...b('Eating out', 0), projected: 900, median: 240 },
+    b('Transport', 7),
+  ]);
+  assert.strictEqual(out[0].kind, 'limit');
+  assert.strictEqual(out[0].name, 'Transport');
+});
+
+test('at most two insights, whatever the budget count', () => {
+  assert.strictEqual(insightsFrom([b('A', 9), b('B', 8), b('C', 7), b('D', 6)]).length, 2);
+});
+
+test('within a rule the worst offender comes first', () => {
+  const out = insightsFrom([b('Mild', 6), b('Bad', 11)]);
+  assert.strictEqual(out[0].name, 'Bad');
+});
+
+test('a budget with no median produces nothing — two months is not a pattern', () => {
+  assert.deepStrictEqual(insightsFrom([{ name: 'New', limit: 50, projected: 400, median: null, overCount: 0, history: [] }]), []);
+});
+
+test('a budget within its usual range is silent', () => {
+  assert.deepStrictEqual(insightsFrom([{ ...b('Calm', 1), projected: 105, median: 100 }]), []);
+});
+
+test('1.4x is the threshold, and it is exclusive', () => {
+  assert.deepStrictEqual(insightsFrom([{ ...b('Edge', 0), projected: 140, median: 100 }]), []);
+  assert.strictEqual(insightsFrom([{ ...b('Edge', 0), projected: 141, median: 100 }]).length, 1);
+});
+
+test('build puts the insights on the snapshot', () => {
+  const s = build({ budgets: [], orders: [], accounts: [], records: [], uncategorized: [] }, '2026-09-18');
+  assert.deepStrictEqual(s.insights, []);
+});
